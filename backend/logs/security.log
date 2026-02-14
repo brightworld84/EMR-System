@@ -1,0 +1,1 @@
+WARNING 2026-01-15 12:26:11,232 log 42502 6276771840 Forbidden (CSRF token from POST incorrect.): /admin/login/
