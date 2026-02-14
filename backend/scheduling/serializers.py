@@ -194,10 +194,6 @@ class PostOpPhoneCallSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-class PostOpPhoneCallSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PostOpPhoneCall
-        fields = "__all__"
 
 class MedicationReconciliationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -499,3 +495,9 @@ class ImplantBillableInformationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+class PreOpPhoneCallSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PreOpPhoneCall
+        fields = "__all__"
+        read_only_fields = ("id", "clinic", "created_at", "updated_at")

@@ -28,37 +28,7 @@ class Patient(models.Model):
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
 
-    # ONC demographics (store as strings for now; can upgrade to coded values later)
-    race = models.CharField(max_length=100, blank=True, default="")
-    ethnicity = models.CharField(max_length=100, blank=True, default="")
-    preferred_language = models.CharField(max_length=50, blank=True, default="English")
-
-    # Optional but useful ONC/USCDI fields
-    sexual_orientation = models.CharField(max_length=100, blank=True, default="")
-    gender_identity = models.CharField(max_length=100, blank=True, default="")
-    middle_name = models.CharField(max_length=100, blank=True)
-    last_name = models.CharField(max_length=100)
-    date_of_birth = models.DateField()
-       
-    # ONC demographics (store as strings for now; can upgrade to coded values later)
-    race = models.CharField(max_length=100, blank=True, default="")
-    ethnicity = models.CharField(max_length=100, blank=True, default="")
-    preferred_language = models.CharField(max_length=50, blank=True, default="English")
-    
-    # Optional but useful ONC/USCDI fields
-    sexual_orientation = models.CharField(max_length=100, blank=True, default="")
-    gender_identity = models.CharField(max_length=100, blank=True, default="")
-    
-    GENDER_CHOICES = [
-        ('M', 'Male'),
-        ('F', 'Female'),
-        ('O', 'Other'),
-        ('U', 'Unknown'),
-    ]
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES) 
-
-    # SSN (encrypted) - HIPAA requires encryption for SSN
-    ssn_encrypted = models.CharField(max_length=500, blank=True)    
+    # Gender
     GENDER_CHOICES = [
         ('M', 'Male'),
         ('F', 'Female'),
@@ -66,6 +36,22 @@ class Patient(models.Model):
         ('U', 'Unknown'),
     ]
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
+
+    # ONC demographics (store as strings for now; can upgrade to coded values later)
+    race = models.CharField(max_length=100, blank=True, default="")
+    ethnicity = models.CharField(max_length=100, blank=True, default="")
+    
+    # Optional but useful ONC/USCDI fields
+    sexual_orientation = models.CharField(max_length=100, blank=True, default="")
+    gender_identity = models.CharField(max_length=100, blank=True, default="")
+    
+    # Preferred Language
+    LANGUAGE_CHOICES = [
+        ('en', 'English'),
+        ('es', 'Spanish'),
+        ('other', 'Other'),
+    ]
+    preferred_language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default='en')
     
     # SSN (encrypted) - HIPAA requires encryption for SSN
     ssn_encrypted = models.CharField(max_length=500, blank=True)
@@ -98,14 +84,6 @@ class Patient(models.Model):
     insurance_secondary_company = models.CharField(max_length=200, blank=True)
     insurance_secondary_policy_number = models.CharField(max_length=100, blank=True)
     insurance_secondary_group_number = models.CharField(max_length=100, blank=True)
-    
-    # Preferred Language
-    LANGUAGE_CHOICES = [
-        ('en', 'English'),
-        ('es', 'Spanish'),
-        ('other', 'Other'),
-    ]
-    preferred_language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default='en')
     
     # Privacy Settings (HIPAA patient rights)
     privacy_restrictions = models.JSONField(
