@@ -36,7 +36,8 @@ export default function PreOpPhoneCall() {
   const [error, setError] = useState('');
   const [isSigned, setIsSigned] = useState(false);
 
-  const [data, setData] = useState({
+  // Form data - matches backend model exactly (32 fields)
+  const [formData, setFormData] = useState({
     dos: '',
     arrival_time: '',
     procedure: '',
@@ -44,216 +45,101 @@ export default function PreOpPhoneCall() {
     weight_lbs: '',
     contact_number: '',
     escort_name_relationship: '',
-
-    prev_surgeries: '',
     
-    // Medical history flags
-    hx_mi: false,
-    hx_cp: false,
-    hx_htn: false,
-    hx_sob: false,
-    hx_arrhythmia: false,
-    hx_cad: false,
-    hx_hyperlipidemia: false,
-    hx_cardiac_other: '',
-
-    hx_copd: false,
-    hx_asthma: false,
-    hx_allergies: false,
-    hx_respiratory_other: '',
-
-    sleep_apnea: false,
-    cpap_used: '',
-    bipap_used: '',
-
-    smoker: '',
-    smoker_years: '',
-    former_smoker: false,
-    year_stopped: '',
-    chronic_cough: false,
-
-    etoh_drug_use: '',
+    prev_surgeries: '',
     anesthesia_issues: '',
-    n_v_after_anesthesia: false,
-    family_history_anesthesia: false,
-    anesthesia_other: '',
-
-    diabetes_type: '',
-    integumentary_psoriasis: false,
-    integumentary_eczema: false,
-    integumentary_cancer: false,
-    integumentary_rashes: false,
-    integumentary_other: '',
-
-    thyroid_hypo: false,
-    thyroid_hyper: false,
-    thyroid_other: '',
-
-    gi_gerd: false,
-    gi_ulcers: false,
-    gi_hiatial_hernia: false,
-    gi_other: '',
-
-    bleeding_anemia: false,
-    bleeding_blood_clot: false,
-    bleeding_sickle_trait: false,
-    bleeding_other: '',
-
-    neuro_cva_tia: false,
-    neuro_seizures: false,
-    neuro_migraines: false,
-    neuro_parkinsons: false,
-    neuro_other: '',
-
-    infectious_mrsa: false,
-    infectious_hepatitis: false,
-    infectious_tb: false,
-    infectious_hiv_aids: false,
-    infectious_shingles: false,
-    infectious_recent_travel: false,
-
-    psych_anxiety: false,
-    psych_depression: false,
-    psych_bipolar: false,
-    psych_ptsd: false,
-    psych_other: '',
-
-    learning_needs_yes: false,
-    learning_needs_no: false,
-    other_notes: '',
-
+    
+    // Medical history (6 Boolean fields)
+    hx_htn: false,
+    hx_asthma: false,
+    hx_copd: false,
+    hx_cad: false,
+    hx_arrhythmia: false,
+    hx_sob: false,
+    
+    // Sleep/respiratory
+    sleep_apnea: false,
+    cpap_used: false,
+    bipap_used: false,
+    chronic_cough: false,
+    
+    // Lifestyle
+    smoker: false,
+    smoker_years: '',
+    etoh_drug_use: false,
+    
     // Patient instructions
     instr_npo: false,
     instr_no_bp_meds: false,
-    instr_loose_clothing: false,
-    instr_advanced_directive: false,
     instr_bring_insurance_id: false,
     instr_leave_valuables: false,
+    instr_loose_clothing: false,
+    instr_glp: false,
+    instr_advanced_directive: false,
     instr_special_instructions: '',
-    instr_glp1_special: false,
-    instr_glp1_dm_clear_liquids_24h: false,
-    instr_glp1_weightloss_off_1week: false,
-
-    // Call attempts
-    attempt1_date: '',
-    attempt1_time: '',
-    attempt1_no_answer: false,
-    attempt1_lvm: false,
-    attempt1_spoke_to: '',
-    attempt1_initials: '',
-
-    attempt2_date: '',
-    attempt2_time: '',
-    attempt2_no_answer: false,
-    attempt2_lvm: false,
-    attempt2_spoke_to: '',
-    attempt2_initials: '',
   });
 
-  // Pack data to match backend structure
-  const packToApi = (ui) => {
-    return {
-      checkin: Number(checkinId),
-      data: ui, // PreOpPhoneCall uses a single JSONField "data"
-      call_attempts: [
-        ...(ui.attempt1_date || ui.attempt1_time || ui.attempt1_spoke_to ? [{
-          attempt: 1,
-          date: ui.attempt1_date,
-          time: ui.attempt1_time,
-          no_answer: ui.attempt1_no_answer,
-          left_message: ui.attempt1_lvm,
-          spoke_to: ui.attempt1_spoke_to,
-          by: ui.attempt1_initials,
-        }] : []),
-        ...(ui.attempt2_date || ui.attempt2_time || ui.attempt2_spoke_to ? [{
-          attempt: 2,
-          date: ui.attempt2_date,
-          time: ui.attempt2_time,
-          no_answer: ui.attempt2_no_answer,
-          left_message: ui.attempt2_lvm,
-          spoke_to: ui.attempt2_spoke_to,
-          by: ui.attempt2_initials,
-        }] : []),
-      ],
+  // Load existing record or create new one
+  useEffect(() => {
+    const loadOrCreate = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        // Try to find existing record
+        const listRes = await api.get('/pre-op-phone-call/', {
+          params: { checkin: checkinId }
+        });
+
+        if (listRes.data.results && listRes.data.results.length > 0) {
+          // Record exists - load it
+          const existing = listRes.data.results[0];
+          setRecordId(existing.id);
+          setFormData(existing);
+          setIsSigned(existing.completed || false);
+        } else {
+          // Create new record
+          const createRes = await api.post('/pre-op-phone-call/', {
+            checkin: checkinId,
+          });
+          setRecordId(createRes.data.id);
+          setFormData(createRes.data);
+        }
+      } catch (e) {
+        console.error(e);
+        setError('Failed to load form');
+      } finally {
+        setLoading(false);
+      }
     };
-  };
 
-  // Unpack data from backend
-  const unpackFromApi = (rec) => {
-    const backendData = rec.data || {};
-    const attempts = rec.call_attempts || [];
-    
-    const attempt1 = attempts.find(a => a.attempt === 1) || {};
-    const attempt2 = attempts.find(a => a.attempt === 2) || {};
+    loadOrCreate();
+  }, [checkinId]);
 
-    return {
-      ...backendData,
-      attempt1_date: attempt1.date || '',
-      attempt1_time: attempt1.time || '',
-      attempt1_no_answer: attempt1.no_answer || false,
-      attempt1_lvm: attempt1.left_message || false,
-      attempt1_spoke_to: attempt1.spoke_to || '',
-      attempt1_initials: attempt1.by || '',
+  // Auto-save on field change
+  const handleFieldChange = async (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
 
-      attempt2_date: attempt2.date || '',
-      attempt2_time: attempt2.time || '',
-      attempt2_no_answer: attempt2.no_answer || false,
-      attempt2_lvm: attempt2.left_message || false,
-      attempt2_spoke_to: attempt2.spoke_to || '',
-      attempt2_initials: attempt2.by || '',
-    };
-  };
-
-  // Load or create record
-  const loadOrCreate = async () => {
-    setError('');
-    setLoading(true);
+    if (!recordId) return;
 
     try {
-      const res = await api.get(`/pre-op-phone-call/?checkin=${checkinId}`);
-      const list = res.data || [];
-      
-      if (list.length > 0) {
-        const rec = list[0];
-        setRecordId(rec.id);
-        setIsSigned(rec.completed || false);
-        setData((prev) => ({ ...prev, ...unpackFromApi(rec) }));
-      } else {
-        // Create minimal record
-        const payload = {
-          checkin: Number(checkinId),
-          data: {},
-          call_attempts: [],
-        };
-        const created = await api.post(`/pre-op-phone-call/`, payload);
-        setRecordId(created.data.id);
-        setIsSigned(false);
-        setData((prev) => ({ ...prev, ...unpackFromApi(created.data) }));
-      }
+      await api.patch(`/pre-op-phone-call/${recordId}/`, {
+        [field]: value,
+      });
     } catch (e) {
-      console.error(e);
-      setError('Failed to load Pre-Op Phone Call record.');
-    } finally {
-      setLoading(false);
+      console.error('Auto-save failed:', e);
     }
   };
 
-  useEffect(() => {
-    loadOrCreate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkinId]);
-
-  // Save draft
-  const saveDraft = async () => {
+  // Manual save
+  const handleSave = async () => {
     if (!recordId) return;
     setSaving(true);
     setError('');
 
     try {
-      const payload = packToApi(data);
-      const res = await api.patch(`/pre-op-phone-call/${recordId}/`, payload);
-      setData((prev) => ({ ...prev, ...unpackFromApi(res.data) }));
-      setIsSigned(res.data.completed || false);
+      const res = await api.patch(`/pre-op-phone-call/${recordId}/`, formData);
+      setFormData(res.data);
+      alert('Saved successfully!');
     } catch (e) {
       console.error(e);
       setError('Save failed. Please try again.');
@@ -262,61 +148,29 @@ export default function PreOpPhoneCall() {
     }
   };
 
-  // Sign/Lock
-  const signRecord = async () => {
+  // Sign and lock
+  const handleSign = async () => {
     if (!recordId) return;
+    if (!window.confirm('Sign and lock this form? You will not be able to edit it after signing.')) return;
+
     setSaving(true);
     setError('');
 
     try {
-      // First save current data
-      await saveDraft();
-      
-      // Then mark as completed
       const res = await api.patch(`/pre-op-phone-call/${recordId}/`, {
+        ...formData,
         completed: true,
       });
-      
+      setFormData(res.data);
       setIsSigned(true);
-      setData((prev) => ({ ...prev, ...unpackFromApi(res.data) }));
+      alert('Form signed and locked!');
     } catch (e) {
       console.error(e);
-      setError('Unable to sign this record.');
+      setError('Failed to sign form.');
     } finally {
       setSaving(false);
     }
   };
-
-  // Unlock
-  const unlockRecord = async () => {
-    if (!recordId) return;
-    setSaving(true);
-    setError('');
-
-    try {
-      const res = await api.patch(`/pre-op-phone-call/${recordId}/`, {
-        completed: false,
-      });
-      
-      setIsSigned(false);
-      setData((prev) => ({ ...prev, ...unpackFromApi(res.data) }));
-    } catch (e) {
-      console.error(e);
-      setError('Unable to unlock this record.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const setField = (key, value) => setData((prev) => ({ ...prev, [key]: value }));
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading…</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -326,143 +180,295 @@ export default function PreOpPhoneCall() {
             <h1 className="text-xl font-bold text-gray-900">Pre-Op Phone Call</h1>
             <p className="text-sm text-gray-600">
               Check-in: <span className="font-semibold">{checkinId}</span>
-              {isSigned ? <span className="ml-2 text-xs font-semibold">🔒 Locked</span> : <span className="ml-2 text-xs font-semibold">📝 Draft</span>}
+              {isSigned ? (
+                <span className="ml-2 text-xs font-semibold text-green-600">🔒 Completed</span>
+              ) : (
+                <span className="ml-2 text-xs font-semibold text-gray-500">📝 Draft</span>
+              )}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => navigate(-1)} className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
               ← Back
             </button>
 
-            {!isSigned ? (
+            {!isSigned && (
               <>
                 <button
-                  onClick={saveDraft}
-                  disabled={saving}
+                  onClick={handleSave}
+                  disabled={saving || !recordId}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:bg-blue-300"
                 >
                   {saving ? 'Saving…' : 'Save'}
                 </button>
                 <button
-                  onClick={signRecord}
-                  disabled={saving}
+                  onClick={handleSign}
+                  disabled={saving || !recordId}
                   className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold disabled:bg-gray-400"
                 >
-                  {saving ? 'Locking…' : 'Sign / Lock'}
+                  {saving ? 'Signing…' : 'Sign & Lock'}
                 </button>
               </>
-            ) : (
-              <button
-                onClick={unlockRecord}
-                disabled={saving}
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold disabled:bg-amber-300"
-              >
-                {saving ? 'Unlocking…' : 'Unlock'}
-              </button>
             )}
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>}
-
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <TextField label="DOS" value={data.dos} onChange={(v) => setField('dos', v)} disabled={isSigned} placeholder="YYYY-MM-DD" />
-          <TextField label="Arrival Time" value={data.arrival_time} onChange={(v) => setField('arrival_time', v)} disabled={isSigned} placeholder="HH:MM" />
-          <TextField label="Procedure" value={data.procedure} onChange={(v) => setField('procedure', v)} disabled={isSigned} />
-          <TextField label="Height" value={data.height} onChange={(v) => setField('height', v)} disabled={isSigned} placeholder={`e.g., 5' 10"`} />
-          <TextField label="Weight (lbs)" value={data.weight_lbs} onChange={(v) => setField('weight_lbs', v)} disabled={isSigned} placeholder="e.g., 180" />
-          <TextField label="Contact #" value={data.contact_number} onChange={(v) => setField('contact_number', v)} disabled={isSigned} />
-          <TextField label="Escort Name & Relationship" value={data.escort_name_relationship} onChange={(v) => setField('escort_name_relationship', v)} disabled={isSigned} />
-        </section>
-
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Previous Surgeries (with dates)</h2>
-          <textarea
-            className="w-full min-h-[120px] px-3 py-2 border border-gray-300 rounded-lg"
-            value={data.prev_surgeries || ''}
-            onChange={(e) => setField('prev_surgeries', e.target.value)}
-            disabled={isSigned}
-            placeholder="Example: ACL repair — 2019-06-12"
-          />
-        </section>
-
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Key Medical History</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <CheckboxRow label="HTN" checked={data.hx_htn} onChange={(v) => setField('hx_htn', v)} disabled={isSigned} />
-            <CheckboxRow label="CAD" checked={data.hx_cad} onChange={(v) => setField('hx_cad', v)} disabled={isSigned} />
-            <CheckboxRow label="Arrhythmia" checked={data.hx_arrhythmia} onChange={(v) => setField('hx_arrhythmia', v)} disabled={isSigned} />
-            <CheckboxRow label="SOB" checked={data.hx_sob} onChange={(v) => setField('hx_sob', v)} disabled={isSigned} />
-            <CheckboxRow label="COPD" checked={data.hx_copd} onChange={(v) => setField('hx_copd', v)} disabled={isSigned} />
-            <CheckboxRow label="Asthma" checked={data.hx_asthma} onChange={(v) => setField('hx_asthma', v)} disabled={isSigned} />
-            <CheckboxRow label="Sleep Apnea" checked={data.sleep_apnea} onChange={(v) => setField('sleep_apnea', v)} disabled={isSigned} />
-            <CheckboxRow label="Chronic Cough" checked={data.chronic_cough} onChange={(v) => setField('chronic_cough', v)} disabled={isSigned} />
+        {loading && (
+          <div className="bg-white rounded-lg shadow p-6 text-gray-600">Loading…</div>
+        )}
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
           </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <TextField label="CPAP Used (Yes/No)" value={data.cpap_used} onChange={(v) => setField('cpap_used', v)} disabled={isSigned} />
-            <TextField label="BiPAP Used (Yes/No)" value={data.bipap_used} onChange={(v) => setField('bipap_used', v)} disabled={isSigned} />
-            <TextField label="Smoker (PPD)" value={data.smoker} onChange={(v) => setField('smoker', v)} disabled={isSigned} />
-            <TextField label="Years" value={data.smoker_years} onChange={(v) => setField('smoker_years', v)} disabled={isSigned} />
-            <TextField label="ETOH / Recreational Drug Use" value={data.etoh_drug_use} onChange={(v) => setField('etoh_drug_use', v)} disabled={isSigned} placeholder="Free text" />
-            <TextField label="Anesthesia issues" value={data.anesthesia_issues} onChange={(v) => setField('anesthesia_issues', v)} disabled={isSigned} placeholder="N/V, MH, difficult airway, etc." />
-          </div>
-        </section>
+        {!loading && (
+          <>
+            {/* Basic Information */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <TextField
+                label="Date of Surgery (DOS)"
+                value={formData.dos}
+                onChange={(v) => handleFieldChange('dos', v)}
+                disabled={isSigned}
+                placeholder="YYYY-MM-DD"
+              />
+              <TextField
+                label="Arrival Time"
+                value={formData.arrival_time}
+                onChange={(v) => handleFieldChange('arrival_time', v)}
+                disabled={isSigned}
+                placeholder="HH:MM"
+              />
+              <TextField
+                label="Procedure"
+                value={formData.procedure}
+                onChange={(v) => handleFieldChange('procedure', v)}
+                disabled={isSigned}
+              />
+              <TextField
+                label="Height"
+                value={formData.height}
+                onChange={(v) => handleFieldChange('height', v)}
+                disabled={isSigned}
+                placeholder="e.g., 5'10 inches"
+              />
+              <TextField
+                label="Weight (lbs)"
+                value={formData.weight_lbs}
+                onChange={(v) => handleFieldChange('weight_lbs', v)}
+                disabled={isSigned}
+                placeholder="e.g., 180"
+              />
+              <TextField
+                label="Contact Number"
+                value={formData.contact_number}
+                onChange={(v) => handleFieldChange('contact_number', v)}
+                disabled={isSigned}
+              />
+              <TextField
+                label="Escort Name & Relationship"
+                value={formData.escort_name_relationship}
+                onChange={(v) => handleFieldChange('escort_name_relationship', v)}
+                disabled={isSigned}
+                placeholder="e.g., John Doe (spouse)"
+              />
+            </section>
 
-        {/* Patient instructions */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Given Patient Instructions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <CheckboxRow label="NPO after midnight (or 8 hours prior)" checked={data.instr_npo} onChange={(v) => setField('instr_npo', v)} disabled={isSigned} />
-            <CheckboxRow label='No BP meds ending in "-prils" or "-sartans" on DOS' checked={data.instr_no_bp_meds} onChange={(v) => setField('instr_no_bp_meds', v)} disabled={isSigned} />
-            <CheckboxRow label="Wear loose clothing" checked={data.instr_loose_clothing} onChange={(v) => setField('instr_loose_clothing', v)} disabled={isSigned} />
-            <CheckboxRow label="Advanced directive reviewed (DNR suspended while at center)" checked={data.instr_advanced_directive} onChange={(v) => setField('instr_advanced_directive', v)} disabled={isSigned} />
-            <CheckboxRow label="Bring insurance card + photo ID" checked={data.instr_bring_insurance_id} onChange={(v) => setField('instr_bring_insurance_id', v)} disabled={isSigned} />
-            <CheckboxRow label="Leave valuables/jewelry at home" checked={data.instr_leave_valuables} onChange={(v) => setField('instr_leave_valuables', v)} disabled={isSigned} />
-            <CheckboxRow label="Special instructions regarding GLP-1's" checked={data.instr_glp1_special} onChange={(v) => setField('instr_glp1_special', v)} disabled={isSigned} />
-            <CheckboxRow label="If GLP-1 for DM: ONLY clear liquids 24 hrs before surgery" checked={data.instr_glp1_dm_clear_liquids_24h} onChange={(v) => setField('instr_glp1_dm_clear_liquids_24h', v)} disabled={isSigned} />
-            <CheckboxRow label="If GLP-1 for weight loss: OFF 1 WEEK prior to surgery" checked={data.instr_glp1_weightloss_off_1week} onChange={(v) => setField('instr_glp1_weightloss_off_1week', v)} disabled={isSigned} />
-          </div>
+            {/* Previous Surgeries */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Previous Surgeries</h2>
+              <textarea
+                className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-lg"
+                value={formData.prev_surgeries || ''}
+                onChange={(e) => handleFieldChange('prev_surgeries', e.target.value)}
+                disabled={isSigned}
+                placeholder="List previous surgeries with dates..."
+              />
+            </section>
 
-          <div className="mt-4">
-            <TextField
-              label="Special Instructions (free text)"
-              value={data.instr_special_instructions}
-              onChange={(v) => setField('instr_special_instructions', v)}
-              disabled={isSigned}
-              placeholder="Type any additional instructions…"
-            />
-          </div>
-        </section>
+            {/* Medical History */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Medical History</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <CheckboxRow
+                  label="Hypertension (HTN)"
+                  checked={formData.hx_htn}
+                  onChange={(v) => handleFieldChange('hx_htn', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Coronary Artery Disease (CAD)"
+                  checked={formData.hx_cad}
+                  onChange={(v) => handleFieldChange('hx_cad', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Arrhythmia"
+                  checked={formData.hx_arrhythmia}
+                  onChange={(v) => handleFieldChange('hx_arrhythmia', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Shortness of Breath (SOB)"
+                  checked={formData.hx_sob}
+                  onChange={(v) => handleFieldChange('hx_sob', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="COPD"
+                  checked={formData.hx_copd}
+                  onChange={(v) => handleFieldChange('hx_copd', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Asthma"
+                  checked={formData.hx_asthma}
+                  onChange={(v) => handleFieldChange('hx_asthma', v)}
+                  disabled={isSigned}
+                />
+              </div>
+            </section>
 
-        {/* Call attempts */}
-        <section className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Call Attempts</h2>
+            {/* Sleep/Respiratory */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Sleep & Respiratory</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <CheckboxRow
+                  label="Sleep Apnea"
+                  checked={formData.sleep_apnea}
+                  onChange={(v) => handleFieldChange('sleep_apnea', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="CPAP Used"
+                  checked={formData.cpap_used}
+                  onChange={(v) => handleFieldChange('cpap_used', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="BiPAP Used"
+                  checked={formData.bipap_used}
+                  onChange={(v) => handleFieldChange('bipap_used', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Chronic Cough"
+                  checked={formData.chronic_cough}
+                  onChange={(v) => handleFieldChange('chronic_cough', v)}
+                  disabled={isSigned}
+                />
+              </div>
+            </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TextField label="Attempt #1 Date" value={data.attempt1_date} onChange={(v) => setField('attempt1_date', v)} disabled={isSigned} placeholder="YYYY-MM-DD" />
-            <TextField label="Attempt #1 Time" value={data.attempt1_time} onChange={(v) => setField('attempt1_time', v)} disabled={isSigned} placeholder="HH:MM" />
-            <CheckboxRow label="Attempt #1 — No Answer" checked={data.attempt1_no_answer} onChange={(v) => setField('attempt1_no_answer', v)} disabled={isSigned} />
-            <CheckboxRow label="Attempt #1 — LVM" checked={data.attempt1_lvm} onChange={(v) => setField('attempt1_lvm', v)} disabled={isSigned} />
-            <TextField label="Attempt #1 — Spoke to" value={data.attempt1_spoke_to} onChange={(v) => setField('attempt1_spoke_to', v)} disabled={isSigned} />
-            <TextField label="Attempt #1 — Initials" value={data.attempt1_initials} onChange={(v) => setField('attempt1_initials', v)} disabled={isSigned} />
+            {/* Lifestyle */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Lifestyle</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CheckboxRow
+                  label="Smoker"
+                  checked={formData.smoker}
+                  onChange={(v) => handleFieldChange('smoker', v)}
+                  disabled={isSigned}
+                />
+                <TextField
+                  label="Years Smoking"
+                  value={formData.smoker_years}
+                  onChange={(v) => handleFieldChange('smoker_years', v)}
+                  disabled={isSigned}
+                  placeholder="e.g., 10"
+                />
+                <CheckboxRow
+                  label="Alcohol / Drug Use"
+                  checked={formData.etoh_drug_use}
+                  onChange={(v) => handleFieldChange('etoh_drug_use', v)}
+                  disabled={isSigned}
+                />
+              </div>
+            </section>
 
-            <TextField label="Attempt #2 Date" value={data.attempt2_date} onChange={(v) => setField('attempt2_date', v)} disabled={isSigned} placeholder="YYYY-MM-DD" />
-            <TextField label="Attempt #2 Time" value={data.attempt2_time} onChange={(v) => setField('attempt2_time', v)} disabled={isSigned} placeholder="HH:MM" />
-            <CheckboxRow label="Attempt #2 — No Answer" checked={data.attempt2_no_answer} onChange={(v) => setField('attempt2_no_answer', v)} disabled={isSigned} />
-            <CheckboxRow label="Attempt #2 — LVM" checked={data.attempt2_lvm} onChange={(v) => setField('attempt2_lvm', v)} disabled={isSigned} />
-            <TextField label="Attempt #2 — Spoke to" value={data.attempt2_spoke_to} onChange={(v) => setField('attempt2_spoke_to', v)} disabled={isSigned} />
-            <TextField label="Attempt #2 — Initials" value={data.attempt2_initials} onChange={(v) => setField('attempt2_initials', v)} disabled={isSigned} />
-          </div>
-        </section>
+            {/* Anesthesia History */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Anesthesia History</h2>
+              <textarea
+                className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-lg"
+                value={formData.anesthesia_issues || ''}
+                onChange={(e) => handleFieldChange('anesthesia_issues', e.target.value)}
+                disabled={isSigned}
+                placeholder="Any issues with anesthesia? (N/V, difficult airway, malignant hyperthermia, etc.)"
+              />
+            </section>
 
-        <div className="text-xs text-gray-500 text-center">
-          Medication/allergy details continue on Medication Reconciliation Form.
-        </div>
+            {/* Patient Instructions */}
+            <section className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-3">Patient Instructions Given</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <CheckboxRow
+                  label="NPO after midnight"
+                  checked={formData.instr_npo}
+                  onChange={(v) => handleFieldChange('instr_npo', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="No BP meds (ACE/ARB) on DOS"
+                  checked={formData.instr_no_bp_meds}
+                  onChange={(v) => handleFieldChange('instr_no_bp_meds', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Bring insurance card & ID"
+                  checked={formData.instr_bring_insurance_id}
+                  onChange={(v) => handleFieldChange('instr_bring_insurance_id', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Leave valuables at home"
+                  checked={formData.instr_leave_valuables}
+                  onChange={(v) => handleFieldChange('instr_leave_valuables', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Wear loose clothing"
+                  checked={formData.instr_loose_clothing}
+                  onChange={(v) => handleFieldChange('instr_loose_clothing', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="GLP-1 instructions"
+                  checked={formData.instr_glp}
+                  onChange={(v) => handleFieldChange('instr_glp', v)}
+                  disabled={isSigned}
+                />
+                <CheckboxRow
+                  label="Advanced directive reviewed"
+                  checked={formData.instr_advanced_directive}
+                  onChange={(v) => handleFieldChange('instr_advanced_directive', v)}
+                  disabled={isSigned}
+                />
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Special Instructions
+                </label>
+                <textarea
+                  className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-lg"
+                  value={formData.instr_special_instructions || ''}
+                  onChange={(e) => handleFieldChange('instr_special_instructions', e.target.value)}
+                  disabled={isSigned}
+                  placeholder="Any additional special instructions..."
+                />
+              </div>
+            </section>
+          </>
+        )}
       </main>
     </div>
   );

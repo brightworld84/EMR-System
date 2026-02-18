@@ -16,20 +16,6 @@ function Field({ label, value }) {
   );
 }
 
-// --- Form status helpers (used for button indicators) ---
-function getFormMeta(form) {
-  const isSigned = !!(form && (form.is_signed || form.signed_at || form.signed_by));
-  const isLocked = !!(form && (form.is_locked || form.pacu_autofill_locked));
-  const isComplete = isSigned || isLocked;
-  return { isSigned, isLocked, isComplete };
-}
-
-function getStatusDot(form) {
-  const { isSigned, isLocked } = getFormMeta(form);
-  if (isSigned || isLocked) return '🔒';   // locked/signed
-  return '📝';                              // draft
-}
-
 function PatientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -38,13 +24,28 @@ function PatientDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [activeCheckin, setActiveCheckin] = useState(null);
-  const [checkinLoading, setCheckinLoading] = useState(false);
-  const [checkinError, setCheckinError] = useState('');
+  // Check-ins (all, not just active)
+  const [checkins, setCheckins] = useState([]);
+  const [checkinsLoading, setCheckinsLoading] = useState(false);
+  const [checkinsError, setCheckinsError] = useState('');
 
   const [appointments, setAppointments] = useState([]);
   const [apptLoading, setApptLoading] = useState(false);
   const [apptError, setApptError] = useState('');
+
+  // Documents
+  const [docs, setDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState('');
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadForm, setUploadForm] = useState({
+    doc_type: 'other',
+    title: '',
+    notes: '',
+    file: null,
+  });
 
   const isSameLocalDay = (dateStr) => {
     const d = new Date(dateStr);
@@ -58,7 +59,6 @@ function PatientDetail() {
 
   const todaysAppt = useMemo(() => {
     if (!Array.isArray(appointments)) return null;
-
     return (
       appointments.find(
         (a) =>
@@ -72,7 +72,6 @@ function PatientDetail() {
   const upcomingAppointments = useMemo(() => {
     if (!Array.isArray(appointments)) return [];
     const now = new Date();
-
     return [...appointments]
       .filter((a) => a?.scheduled_start && new Date(a.scheduled_start) >= now)
       .sort((a, b) => new Date(a.scheduled_start) - new Date(b.scheduled_start));
@@ -81,7 +80,6 @@ function PatientDetail() {
   const pastAppointments = useMemo(() => {
     if (!Array.isArray(appointments)) return [];
     const now = new Date();
-
     return [...appointments]
       .filter((a) => a?.scheduled_start && new Date(a.scheduled_start) < now)
       .sort((a, b) => new Date(b.scheduled_start) - new Date(a.scheduled_start));
@@ -91,11 +89,10 @@ function PatientDetail() {
     return upcomingAppointments.length > 0 ? upcomingAppointments[0] : null;
   }, [upcomingAppointments]);
 
-   const fetchAppointments = async () => {
+  const fetchAppointments = async () => {
     try {
       setApptError('');
       setApptLoading(true);
-
       const res = await api.get(`/appointments/?patient=${id}&ordering=-scheduled_start`);
       setAppointments(res.data?.results ?? res.data ?? []);
     } catch (err) {
@@ -105,12 +102,11 @@ function PatientDetail() {
       setApptLoading(false);
     }
   };
-  
+
   const fetchDocuments = async () => {
     try {
       setDocsError('');
       setDocsLoading(true);
-
       const res = await api.get(`/documents/?patient=${id}`);
       const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
       setDocs(data);
@@ -122,32 +118,19 @@ function PatientDetail() {
     }
   };
 
-  const [formStatus, setFormStatus] = useState({
-    immediatePostOp: null,
-    exparel: null,
-    implant: null,
-    pacuMobility: null,
-    pacuProgressNotes: null,
-    pacuAdditionalNursingNotes: null,
-    pacuRecord: null,
-  });
-
-  const fetchActiveCheckin = async () => {
+  // Fetch ALL check-ins for this patient (not just active)
+  const fetchCheckins = async () => {
     try {
-      setCheckinError('');
-      setCheckinLoading(true);
-          
-      const res = await api.get('/checkins/live/');
-      const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
-      
-      // find the active check-in for this patient
-      const found = list.find((c) => String(c.patient) === String(id)) || null;
-      setActiveCheckin(found);
-    } catch (e) {
-      console.error('Failed to load active check-in', e);
-      setCheckinError('Failed to load active PACU check-in.');
+      setCheckinsError('');
+      setCheckinsLoading(true);
+      const res = await api.get(`/checkins/?patient=${id}&ordering=-check_in_time`);
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setCheckins(data);
+    } catch (err) {
+      console.error('Failed to load check-ins', err);
+      setCheckinsError('Failed to load check-in history.');
     } finally {
-      setCheckinLoading(false);
+      setCheckinsLoading(false);
     }
   };
 
@@ -155,53 +138,9 @@ function PatientDetail() {
     fetchPatient();
     fetchAppointments();
     fetchDocuments();
-    fetchActiveCheckin();
+    fetchCheckins();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-  
-  useEffect(() => {
-    if (activeCheckin?.id) {
-      fetchFormStatus(activeCheckin.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCheckin?.id]);
-
-  const fetchFormStatus = async (checkinId) => {
-    if (!checkinId) return;
-
-    const getFirst = (res) => {
-      const d = res.data;
-      const list = Array.isArray(d) ? d : (d?.results || []);
-      return list.length ? list[0] : null;
-    };
-
-    try {
-      const results = await Promise.allSettled([
-        api.get(`/immediate-postop-progress-note/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/exparel-billing-worksheet/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/implant-billable-information/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/pacu-mobility/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/pacu-progress-notes/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/pacu-additional-nursing-notes/?checkin=${encodeURIComponent(checkinId)}`),
-        api.get(`/pacu-records/?checkin=${encodeURIComponent(checkinId)}`),
-      ]);
-
-      const safe = (i) => (results[i].status === 'fulfilled' ? getFirst(results[i].value) : null);
-
-      setFormStatus({
-        immediatePostOp: safe(0),
-        exparel: safe(1),
-        implant: safe(2),
-        pacuMobility: safe(3),
-        pacuProgressNotes: safe(4),
-        pacuAdditionalNursingNotes: safe(5),
-        pacuRecord: safe(6),
-      });
-    } catch (e) {
-      // don’t block the page if this fails
-      console.warn('Failed to load form statuses', e);
-    }
-  };
 
   const handleUploadChange = (e) => {
     const { name, value } = e.target;
@@ -224,7 +163,6 @@ function PatientDetail() {
 
     try {
       setUploading(true);
-
       const fd = new FormData();
       fd.append('patient', String(id));
       fd.append('doc_type', uploadForm.doc_type);
@@ -236,10 +174,7 @@ function PatientDetail() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // reset
       setUploadForm({ doc_type: 'other', title: '', notes: '', file: null });
-
-      // refresh list
       fetchDocuments();
     } catch (err) {
       console.error('Upload failed', err);
@@ -249,24 +184,11 @@ function PatientDetail() {
     }
   };
 
-    // Documents
-  const [docs, setDocs] = useState([]);
-  const [docsLoading, setDocsLoading] = useState(false);
-  const [docsError, setDocsError] = useState('');
-
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [uploadForm, setUploadForm] = useState({
-    doc_type: 'other',
-    title: '',
-    notes: '',
-    file: null,
-  });
-
   const checkInNow = async (appointmentId) => {
     try {
       await api.post(`/appointments/${appointmentId}/checkin/`);
-      await fetchAppointments(); // refresh appointment list
+      await fetchAppointments();
+      await fetchCheckins(); // Refresh check-ins
       alert('Patient checked in.');
     } catch (err) {
       console.error('Check-in failed', err);
@@ -306,6 +228,55 @@ function PatientDetail() {
     return a;
   }, [patient]);
 
+  // Render form buttons for a check-in
+  const renderFormButtons = (checkin) => {
+    const formButtons = [
+      { label: 'Pre-Op Phone Call', path: `/checkins/${checkin.id}/pre-op-phone-call`, color: 'emerald' },
+      { label: 'Fall Risk (Pre-Op Testing)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop-testing`, color: 'emerald' },
+      { label: 'Fall Risk (Pre-Operative)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop`, color: 'emerald' },
+      { label: 'Pre-Op Nurse Notes', path: `/checkins/${checkin.id}/preoperative-nurses-notes`, color: 'emerald' },
+      { label: 'History & Physical', path: `/checkins/${checkin.id}/history-and-physical`, color: 'emerald' },
+      { label: 'Consent for Anesthesia', path: `/checkins/${checkin.id}/consent-for-anesthesia-services`, color: 'emerald' },
+      { label: 'Anesthesia Orders', path: `/checkins/${checkin.id}/anesthesia-orders`, color: 'emerald' },
+      { label: 'Peripheral Nerve Block', path: `/checkins/${checkin.id}/peripheral-nerve-block-procedure-note`, color: 'emerald' },
+      { label: 'Medication Reconciliation', path: `/checkins/${checkin.id}/medication-reconciliation`, color: 'emerald' },
+      { label: 'Operating Room Record', path: `/checkins/${checkin.id}/operating-room-record`, color: 'emerald' },
+      { label: 'Anesthesia Record', path: `/checkins/${checkin.id}/anesthesia-record`, color: 'emerald' },
+      { label: 'Immediate Post-Op Note', path: `/checkins/${checkin.id}/immediate-postop-progress-note`, color: 'indigo' },
+      { label: 'PACU Record', path: `/checkins/${checkin.id}/pacu-record`, color: 'emerald' },
+      { label: 'PACU Mobility Assessment', path: `/checkins/${checkin.id}/pacu-mobility`, color: 'blue' },
+      { label: 'PACU Additional Notes', path: `/checkins/${checkin.id}/pacu-additional-nursing-notes`, color: 'indigo' },
+      { label: 'Exparel Billing', path: `/checkins/${checkin.id}/exparel-billing-worksheet`, color: 'emerald' },
+      { label: 'Implant / Billable Info', path: `/checkins/${checkin.id}/implant-billable-information`, color: 'emerald' },
+      { label: 'Post-Op Phone Call', path: `/checkins/${checkin.id}/post-operative-phone-call`, color: 'indigo' },
+      { label: 'Infection Education', path: `/checkins/${checkin.id}/post-op-infection-education`, color: 'indigo' },
+      { label: 'DVT/PE Education', path: `/checkins/${checkin.id}/dvt-pe-education`, color: 'indigo' },
+      { label: 'Patient Instructions', path: `/checkins/${checkin.id}/patient-instructions`, color: 'gray' },
+    ];
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {formButtons.map((btn, idx) => {
+          const colorClass = 
+            btn.color === 'emerald' ? 'bg-emerald-700 hover:bg-emerald-800' :
+            btn.color === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-700' :
+            btn.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
+            'bg-gray-900 hover:bg-black';
+
+          return (
+            <button
+              key={idx}
+              onClick={() => navigate(btn.path)}
+              className={`px-3 py-2 ${colorClass} text-white rounded-lg text-sm font-semibold`}
+            >
+              {btn.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -337,207 +308,211 @@ function PatientDetail() {
       </div>
     );
   }
-  const renderButtonStatus = (obj) => {
-    if (!obj) return null;
 
-    const isSigned = !!obj.is_signed || !!obj.is_locked;
-    return (
-      <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-        isSigned
-          ? 'bg-gray-100 text-gray-800 border-gray-200'
-          : 'bg-blue-50 text-blue-800 border-blue-200'
-      }`}>
-        {isSigned ? '🔒 Signed' : '✅ Started'}
-      </span>
-    );
-  };
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */} 
+      {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-    
-        {/* Patient Info */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {fullName || 'Patient'}
-          </h1>
-          <p className="text-sm text-gray-600">
-            MRN: <span className="font-semibold">{patient.medical_record_number}</span>
-            {' • '}
-            DOB: <span className="font-semibold">{patient.date_of_birth || '—'}</span>
-            {' • '}
-            Age: <span className="font-semibold">{age || '—'}</span>
-          </p>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{fullName || 'Patient'}</h1>
+            <p className="text-sm text-gray-600">
+              MRN: <span className="font-semibold">{patient.medical_record_number}</span>
+              {' • '}
+              DOB: <span className="font-semibold">{patient.date_of_birth || '—'}</span>
+              {' • '}
+              Age: <span className="font-semibold">{age || '—'}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => navigate('/patients')}
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
+              ← Patients
+            </button>
+
+            <button
+              onClick={() => navigate(`/schedule/new?patientId=${id}`)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+            >
+              Schedule Appointment
+            </button>
+
+            {todaysAppt && (
+              <button
+                onClick={() => checkInNow(todaysAppt.id)}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
+              >
+                Check In Now
+              </button>
+            )}
+
+            <button
+              onClick={() => navigate(`/patients/${id}/edit`)}
+              className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => navigate(`/print/patient/${id}`)}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold"
+            >
+              Print / PDF
+            </button>
+          </div>
         </div>
+      </header>
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => navigate('/patients')}
-            className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
-          >
-            ← Patients
-          </button>
-
-          <button
-            onClick={() => navigate(`/schedule/new?patientId=${id}`)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
-          >
-            Schedule Appointment
-          </button>
-
-        {todaysAppt && (
-          <button
-            onClick={() => checkInNow(todaysAppt.id)}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
-            title="Check in patient for today’s appointment"
-          >
-            Check In Now
-          </button>
-        )}
-
-        <button
-          onClick={() => navigate(`/patients/${id}/edit`)}
-          className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold"
-        >
-          Edit
-        </button>
-        
-        <button
-          onClick={() => navigate(`/print/patient/${id}`)}
-          className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold"
-        >
-          Print / PDF
-        </button>
-
-        <button
-          onClick={() => alert('Next: Encounter creation')}
-          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-        >
-          + New Encounter
-        </button>
-      </div>
-
-    </div>
-  </header>
-
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
         {/* Demographics */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-3">Demographics</h2>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field
               label="Sex (Administrative)"
               value={
-                patient.gender === 'M'
-                ? 'Male'
-                : patient.gender === 'F'
-                ? 'Female'
-                : patient.gender === 'O'
-                ? 'Other'
-                : '—'
+                patient.gender === 'M' ? 'Male' :
+                patient.gender === 'F' ? 'Female' :
+                patient.gender === 'O' ? 'Other' : '—'
               }
             />
-
-            <Field
-              label="Race"
-              value={displayValue(patient.race, RACE_LABELS)}
-            />
-
-            <Field
-              label="Ethnicity"
-              value={displayValue(patient.ethnicity, ETHNICITY_LABELS)}
-            />
-
-            <Field 
-              label="Preferred Language" 
-              value={displayLanguage(patient.preferred_language)} 
-            />
-
-            <Field
-              label="Sexual Orientation"
-              value={displaySexualOrientation(patient.sexual_orientation)}
-            />
-
-            <Field
-              label="Gender Identity"
-              value={displayGenderIdentity(patient.gender_identity)}
-            />
+            <Field label="Race" value={displayValue(patient.race, RACE_LABELS)} />
+            <Field label="Ethnicity" value={displayValue(patient.ethnicity, ETHNICITY_LABELS)} />
+            <Field label="Preferred Language" value={displayLanguage(patient.preferred_language)} />
+            <Field label="Sexual Orientation" value={displaySexualOrientation(patient.sexual_orientation)} />
+            <Field label="Gender Identity" value={displayGenderIdentity(patient.gender_identity)} />
           </div>
         </section>
 
+        {/* Check-in History - NEW SECTION */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-900 mb-3">Check-in History & Forms</h2>
+
+          {checkinsError && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {checkinsError}
+            </div>
+          )}
+
+          {checkinsLoading ? (
+            <div className="bg-white rounded-lg shadow p-6 text-gray-600">
+              Loading check-in history…
+            </div>
+          ) : checkins.length === 0 ? (
+            <div className="bg-white rounded-lg shadow p-6 text-gray-600">
+              No check-ins recorded for this patient yet.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {checkins.map((checkin) => (
+                <div key={checkin.id} className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-md font-bold text-gray-900">
+                        Check-in #{checkin.id}
+                        {checkin.is_active && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                            Active
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Checked in: {checkin.check_in_time ? new Date(checkin.check_in_time).toLocaleString() : '—'}
+                        {' • '}
+                        Status: <span className="font-semibold">{checkin.status || '—'}</span>
+                        {checkin.check_out_time && (
+                          <>
+                            {' • '}
+                            Checked out: {new Date(checkin.check_out_time).toLocaleString()}
+                          </>
+                        )}
+                      </p>
+                      {checkin.room && (
+                        <p className="text-sm text-gray-600">
+                          Room: <span className="font-semibold">{checkin.room}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Surgery Forms</h4>
+                    {renderFormButtons(checkin)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Appointments */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-3">Appointments</h2>
 
           {apptError && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {apptError}
-          </div>
-        )}
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {apptError}
+            </div>
+          )}
 
-        {apptLoading ? (
-          <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-            Loading appointments…
-          </div>
-        ) : (
-          <>
-            {/* Next Appointment */}
-            {nextAppointment && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="text-sm text-green-900">
-                  <strong>Next Appointment:</strong>{' '}
-                  {new Date(nextAppointment.scheduled_start).toLocaleString()}
-                  {nextAppointment.reason_for_visit ? ` — ${nextAppointment.reason_for_visit}` : ''}
+          {apptLoading ? (
+            <div className="bg-white rounded-lg shadow p-6 text-gray-600">
+              Loading appointments…
+            </div>
+          ) : (
+            <>
+              {nextAppointment && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-sm text-green-900">
+                    <strong>Next Appointment:</strong>{' '}
+                    {new Date(nextAppointment.scheduled_start).toLocaleString()}
+                    {nextAppointment.reason_for_visit ? ` — ${nextAppointment.reason_for_visit}` : ''}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Upcoming */}
-            <h3 className="text-md font-semibold text-gray-900 mb-2">Upcoming</h3>
-
+              <h3 className="text-md font-semibold text-gray-900 mb-2">Upcoming</h3>
               {upcomingAppointments.length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-6 text-gray-600 mb-6">
-                 No upcoming appointments.
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-                 <table className="min-w-full">
-                   <thead className="bg-gray-50">
-                     <tr>
-                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
-                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
-                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                     </tr>
-                   </thead>
-                   <tbody className="bg-white divide-y divide-gray-200">
-                     {upcomingAppointments.map((a) => (
-                       <tr key={a.id} className="hover:bg-gray-50">
-                         <td className="px-6 py-4 text-sm text-gray-900">
-                           {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'}
-                         </td>
-                         <td className="px-6 py-4 text-sm text-gray-900">{a.reason_for_visit || '—'}</td>
-                         <td className="px-6 py-4 text-sm text-gray-900">{a.provider_name || '—'}</td>
-                         <td className="px-6 py-4 text-sm text-gray-900">{a.status || '—'}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
-             )}
+                <div className="bg-white rounded-lg shadow p-6 text-gray-600 mb-6">
+                  No upcoming appointments.
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
+                  <table className="min-w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {upcomingAppointments.map((a) => (
+                        <tr key={a.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {a.scheduled_start ? new Date(a.scheduled_start).toLocaleString() : '—'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{a.reason_for_visit || '—'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{a.provider_name || '—'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{a.status || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-             {/* Past */}
-             <h3 className="text-md font-semibold text-gray-900 mb-2">Past</h3>
-
-             {pastAppointments.length === 0 ? (
-               <div className="bg-white rounded-lg shadow p-6 text-gray-600">
+              <h3 className="text-md font-semibold text-gray-900 mb-2">Past</h3>
+              {pastAppointments.length === 0 ? (
+                <div className="bg-white rounded-lg shadow p-6 text-gray-600">
                   No past appointments.
-               </div>
-             ) : (
-               <div className="bg-white rounded-lg shadow overflow-hidden">
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg shadow overflow-hidden">
                   <table className="min-w-full">
                     <thead className="bg-gray-50">
                       <tr>
@@ -565,11 +540,11 @@ function PatientDetail() {
             </>
           )}
         </section>
-        
+
+        {/* Documents */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-3">Documents</h2>
 
-          {/* Upload form */}
           <div className="bg-white rounded-lg shadow p-6 mb-4">
             {uploadError && (
               <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -632,7 +607,7 @@ function PatientDetail() {
                   accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.doc,.docx"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Upload PDFs, images, scanned forms. All uploads are audit-logged and clinic-scoped.
+                  Upload PDFs, images, scanned forms. All uploads are audit-logged.
                 </p>
               </div>
 
@@ -648,7 +623,6 @@ function PatientDetail() {
             </form>
           </div>
 
-          {/* Document list */}
           {docsError && (
             <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {docsError}
@@ -700,210 +674,6 @@ function PatientDetail() {
           )}
         </section>
 
-        {/* PACU Forms */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold text-gray-900">PACU Forms</h2>
-            <span className="text-xs text-gray-500">Patient Chart only</span>
-          </div>
-
-          {checkinError && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {checkinError}
-            </div>
-          )}
-
-          {checkinLoading ? (
-            <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-              Loading active check-in…
-            </div>
-          ) : !activeCheckin ? (
-            <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-              No active PACU check-in for this patient right now.
-              <div className="text-xs text-gray-500 mt-2">
-                (PACU Mobility Assessment becomes available after check-in.)
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <div className="text-sm text-gray-600">
-                    Active Check-in ID: <span className="font-semibold">{activeCheckin.id}</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Status: <span className="font-semibold">{activeCheckin.status || '—'}</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Checked in:{" "}
-                    <span className="font-semibold">
-                      {activeCheckin.check_in_time
-                        ? new Date(activeCheckin.check_in_time).toLocaleString()
-                        : '—'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/pre-op-phone-call`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Pre-Op Phone Call
-                  </button>
-                  
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/fall-risk-assessment-preop-testing`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Fall Risk (Pre-Op Testing)
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/fall-risk-assessment-preop`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Fall Risk (Pre-Operative)
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/preoperative-nurses-notes`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Pre-Op Nurse Notes (Pg 1)
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/post-operative-phone-call`)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-                  >
-                    Post-Op Phone Call
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/post-op-infection-education`)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-                  >
-                    Infection Education
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/dvt-pe-education`)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-                  >
-                    DVT/PE Education
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/patient-instructions`)}
-                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold"
-                  >
-                    Patient Instructions
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/history-and-physical`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    History & Physical
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/consent-for-anesthesia-services`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Consent for Anesthesia Services
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/anesthesia-orders`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Anesthesia Orders
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/peripheral-nerve-block-procedure-note`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Peripheral Nerve Block Procedure Note
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/operating-room-record`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Operating Room Record
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/anesthesia-record`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Anesthesia Record
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/exparel-billing-worksheet`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Exparel Billing Worksheet
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/implant-billable-information`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Implant / Billable Info
-                  </button>
-                  
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-mobility`)}
-                    className="px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                  >
-                    PACU Mobility Assessment
-                  </button>
-                
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/immediate-postop-progress-note`)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-                  >
-                    Immediate Post-Op Progress Note
-                  </button>                  
-                  
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-additional-nursing-notes`)}
-                    className="px-4 py-2 bg-indigo-700 text-white rounded-lg hover:bg-indigo-800 font-semibold"
-                  >
-                    PACU Additional Nursing Notes
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-record`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    {getStatusDot(getFormMeta('pacu_record').status)}
-                    PACU Record
-                    {getFormMeta('pacu_record').signed && <span title="Signed">🔒</span>}
-                  </button>
-
-                  <button
-                    onClick={() => navigate(`/checkins/${activeCheckin.id}/medication-reconciliation`)}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 font-semibold"
-                  >
-                    Medication Reconciliation
-                  </button>
-
-                </div>
-              </div>
-
-              <div className="mt-4 text-xs text-gray-500">
-                Forms are saved to the chart and can be signed/locked with tablet signature.
-              </div>
-            </div>
-          )}
-        </section>
-        
         {/* Contact */}
         <section>
           <h2 className="text-lg font-bold text-gray-900 mb-3">Contact</h2>
@@ -946,7 +716,7 @@ function PatientDetail() {
         </section>
 
         <div className="text-xs text-gray-500 text-center">
-          HIPAA: clinic-scoped access enforced server-side; audit logging occurs on API access; data transmitted over authenticated requests.
+          HIPAA: clinic-scoped access enforced server-side; audit logging on all access
         </div>
       </main>
     </div>

@@ -123,6 +123,7 @@ function HistoryAndPhysical() {
       const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
 
       if (list.length > 0) {
+        // Record exists - load it
         const obj = list[0];
         setHpId(obj.id);
         setData((prev) => ({
@@ -131,17 +132,20 @@ function HistoryAndPhysical() {
           checkin: Number(checkinId),
           page1: (obj.page1 && typeof obj.page1 === 'object') ? obj.page1 : (prev.page1 || {}),
         }));
-        return;
+      } else {
+        // Record doesn't exist - create ONE
+        // Check if we're already creating (prevents double-POST in React strict mode)
+        if (hpId) return; // Already have an ID, don't create again
+      
+        const created = await api.post(API_BASE, { checkin: Number(checkinId) });
+        setHpId(created.data.id);
+        setData((prev) => ({
+          ...prev,
+          ...created.data,
+          checkin: Number(checkinId),
+          page1: (created.data.page1 && typeof created.data.page1 === 'object') ? created.data.page1 : (prev.page1 || {}),
+        }));
       }
-
-      const created = await api.post(API_BASE, { checkin: Number(checkinId) });
-      setHpId(created.data.id);
-      setData((prev) => ({
-        ...prev,
-        ...created.data,
-        checkin: Number(checkinId),
-        page1: (created.data.page1 && typeof created.data.page1 === 'object') ? created.data.page1 : (prev.page1 || {}),
-      }));
     } catch (e) {
       console.error(e);
       setError('Failed to load/create History & Physical.');
