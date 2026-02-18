@@ -47,12 +47,14 @@ function ImplantBillableInformation() {
         const f = list[0];
         setFormId(f.id);
         setData((prev) => ({ ...prev, ...f, checkin: Number(checkinId) }));
-        return;
+      } else {
+        // Prevent duplicate POST in React strict mode
+        if (formId) return;
+  
+        const created = await api.post('/implant-billable-information/', { checkin: Number(checkinId) });
+        setFormId(created.data.id);
+        setData((prev) => ({ ...prev, ...created.data, checkin: Number(checkinId) }));
       }
-
-      const created = await api.post('/implant-billable-information/', { checkin: Number(checkinId) });
-      setFormId(created.data.id);
-      setData((prev) => ({ ...prev, ...created.data, checkin: Number(checkinId) }));
     } catch (e) {
       console.error(e);
       setError('Failed to load/create Implant/Billable Information.');

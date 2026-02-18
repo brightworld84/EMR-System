@@ -128,35 +128,30 @@ export default function AnesthesiaOrders() {
       const res = await api.get(`${API_BASE}?checkin=${encodeURIComponent(checkinId)}`);
       const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
 
-      if (list.length > 0) {
+      if (list.length > 0) {   
         const o = list[0];
         setOrderId(o.id);
         setData((prev) => ({
-          ...prev,
-          ...o,
-          checkin: Number(checkinId),
-          preop: o.preop || prev.preop,
-          pacu: o.pacu || prev.pacu,
-        }));
-        return;
-      }
-
-      const created = await api.post(API_BASE, { checkin: Number(checkinId) });
-      setOrderId(created.data.id);
-      setData((prev) => ({
         ...prev,
-        ...created.data,
+        ...o,
         checkin: Number(checkinId),
-        preop: created.data.preop || prev.preop,
-        pacu: created.data.pacu || prev.pacu,
+        preop: o.preop || prev.preop,   
+        pacu: o.pacu || prev.pacu,
       }));
-    } catch (e) {
-      console.error(e);
-      setError('Failed to load/create Anesthesia Orders.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    } else {
+    // Prevent duplicate POST in React strict mode
+    if (orderId) return;
+  
+    const created = await api.post(API_BASE, { checkin: Number(checkinId) });
+    setOrderId(created.data.id);
+    setData((prev) => ({
+      ...prev,
+      ...created.data,
+      checkin: Number(checkinId),
+      preop: created.data.preop || prev.preop,
+      pacu: created.data.pacu || prev.pacu,
+    }));
+  }
 
   useEffect(() => {
     loadOrCreate();
