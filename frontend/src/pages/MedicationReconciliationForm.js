@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from "../services/api";
 
@@ -60,63 +60,180 @@ export default function MedicationReconciliationForm() {
   const { checkinId } = useParams();
   const navigate = useNavigate();
 
-  const { values, setField, setValues, loading, saving, error, saveError, isLocked, save, sign, unlock } =
-    useFormResource({
-      resourcePath: 'medication-reconciliation',
-      checkinId,
-      defaultValues: {
-        checkin: checkinId,
+  const [formId, setFormId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-        source_patient: false,
-        source_family: false,
-        source_pcp_list: false,
-        nka: false,
+  const [data, setData] = useState({
+    checkin: Number(checkinId),
+    
+    source_patient: false,
+    source_family: false,
+    source_pcp_list: false,
+    nka: false,
 
-        allergies: [
-          { item: '', reaction: '' },
-          { item: '', reaction: '' },
-          { item: '', reaction: '' },
-        ],
+    allergies: [
+      { item: '', reaction: '' },
+      { item: '', reaction: '' },
+      { item: '', reaction: '' },
+    ],
 
-        meds: Array.from({ length: 12 }).map(() => ({
-          name: '',
-          dose: '',
-          how_taken: '',
-          frequency: '',
-          last_time_taken: '',
-          hold: false,
-          resume: false,
-        })),
+    meds: Array.from({ length: 12 }).map(() => ({
+      name: '',
+      dose: '',
+      how_taken: '',
+      frequency: '',
+      last_time_taken: '',
+      hold: false,
+      resume: false,
+    })),
+    
+    med_history_verified_by_rn: '',
+    med_history_datetime: '',
+    
+    surgeon_signature: '',
+    discharge_rn_signature: '',
+    discharge_datetime: '',
+  
+    discharge_rx: [
+      { name: '', dose: '', route: '', frequency: '', reason: '' },
+      { name: '', dose: '', route: '', frequency: '', reason: '' },
+      { name: '', dose: '', route: '', frequency: '', reason: '' },
+    ],
 
-        med_history_verified_by_rn: '',
-        med_history_datetime: '',
+    is_signed: false,
+    signed_by: null,
+    signed_at: null,
+  });
 
-        surgeon_signature: '',
-        discharge_rn_signature: '',
-        discharge_datetime: '',
+  const isLocked = !!data.is_signed;
 
-        discharge_rx: [
-          { name: '', dose: '', route: '', frequency: '', reason: '' },
-          { name: '', dose: '', route: '', frequency: '', reason: '' },
-          { name: '', dose: '', route: '', frequency: '', reason: '' },
-        ],
-      },
-    });
+  const setField = (name, value) => {
+    if (isLocked) return;
+    setData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const loadOrCreate = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await api.get(`/medication-reconciliation/?checkin=${encodeURIComponent(checkinId)}`);
+      const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
+
+      if (list.length > 0) {
+        const f = list[0];
+        setFormId(f.id);
+        setData((prev) => ({ ...prev, ...f, checkin: Number(checkinId) }));
+      } else {
+        // Prevent duplicate POST in React strict mode
+        if (formId) return;
+        
+        const created = await api.post('/medication-reconciliation/', { checkin: Number(checkinId) });
+        setFormId(created.data.id);
+        setData((prev) => ({ ...prev, ...created.data, checkin: Number(checkinId) }));
+      }
+    } catch (e) {
+      console.error(e);
+      setError('Failed to load/create Medication Reconciliation Form.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkinId]);
+
+  const save = async () => {
+    if (!formId || isLocked) return;
+    setError('');
+    setSaving(true);
+
+    try {
+      const payload = {
+        source_patient: data.source_patient,
+        source_family: data.source_family,
+        source_pcp_list: data.source_pcp_list,
+        nka: data.nka,
+        allergies: data.allergies,
+        meds: data.meds,
+        med_history_verified_by_rn: data.med_history_verified_by_rn,
+        med_history_datetime: data.med_history_datetime,
+        surgeon_signature: data.surgeon_signature,
+        discharge_rn_signature: data.discharge_rn_signature,
+        discharge_datetime: data.discharge_datetime,
+        discharge_rx: data.discharge_rx,
+      };
+
+      const res = await api.patch(`/medication-reconciliation/${formId}/`, payload);
+      setData((prev) => ({ ...prev, ...res.data }));
+      alert('Saved.');
+    } catch (e) {
+      console.error(e);
+      setError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sign = async () => {
+    if (!formId || isLocked) return;
+
+    setError('');
+    setSaving(true);
+
+    try {
+      await save();
+
+      const res = await api.post(`/medication-reconciliation/${formId}/sign/`, {});
+      setData((prev) => ({ ...prev, ...res.data }));
+      alert('Signed & locked.');
+    } catch (e) {
+      console.error(e);
+      setError('Failed to sign. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unlock = async () => {
+    if (!formId || !isLocked) return;
+
+    setError('');
+    setSaving(true);
+
+    try {
+      const res = await api.post(`/medication-reconciliation/${formId}/unlock/`, {});
+      setData((prev) => ({ ...prev, ...res.data }));
+      alert('Unlocked.');
+    } catch (e) {
+      console.error(e);
+      setError('Failed to unlock. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const updateAllergy = (idx, patch) => {
-    const next = [...(values.allergies || [])];
+    if (isLocked) return;
+    const next = [...(data.allergies || [])];
     next[idx] = { ...(next[idx] || {}), ...patch };
     setField('allergies', next);
   };
 
   const updateMed = (idx, row) => {
-    const next = [...(values.meds || [])];
+    if (isLocked) return;
+    const next = [...(data.meds || [])];
     next[idx] = row;
     setField('meds', next);
   };
 
   const updateRx = (idx, patch) => {
-    const next = [...(values.discharge_rx || [])];
+    if (isLocked) return;
+    const next = [...(data.discharge_rx || [])];
     next[idx] = { ...(next[idx] || {}), ...patch };
     setField('discharge_rx', next);
   };
@@ -140,16 +257,16 @@ export default function MedicationReconciliationForm() {
 
             {!isLocked ? (
               <>
-                <button
-                  onClick={() => save()}
-                  disabled={saving}
+                <button 
+                  onClick={save}
+                  disabled={saving || loading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:bg-blue-300"
                 >
                   {saving ? 'Saving…' : 'Save'}
                 </button>
                 <button
-                  onClick={() => sign()}
-                  disabled={saving}
+                  onClick={sign}
+                  disabled={saving || loading}
                   className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold disabled:bg-gray-400"
                 >
                   {saving ? 'Locking…' : 'Sign / Lock'}
@@ -157,7 +274,7 @@ export default function MedicationReconciliationForm() {
               </>
             ) : (
               <button
-                onClick={() => unlock()}
+                onClick={unlock}
                 disabled={saving}
                 className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold disabled:bg-amber-300"
               >
@@ -171,22 +288,21 @@ export default function MedicationReconciliationForm() {
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {loading && <div className="bg-white rounded-lg shadow p-6 text-gray-600">Loading…</div>}
         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>}
-        {saveError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{saveError}</div>}
 
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-3">Source of Medication List</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <CheckboxRow label="Patient" checked={values.source_patient} onChange={(v) => setField('source_patient', v)} disabled={isLocked} />
-            <CheckboxRow label="Family Member / Guardian / Caregiver" checked={values.source_family} onChange={(v) => setField('source_family', v)} disabled={isLocked} />
-            <CheckboxRow label="Primary Care Physician List" checked={values.source_pcp_list} onChange={(v) => setField('source_pcp_list', v)} disabled={isLocked} />
-            <CheckboxRow label="No Known Allergies (NKA)" checked={values.nka} onChange={(v) => setField('nka', v)} disabled={isLocked} />
+            <CheckboxRow label="Patient" checked={data.source_patient} onChange={(v) => setField('source_patient', v)} disabled={isLocked} />
+            <CheckboxRow label="Family Member / Guardian / Caregiver" checked={data.source_family} onChange={(v) => setField('source_family', v)} disabled={isLocked} />
+            <CheckboxRow label="Primary Care Physician List" checked={data.source_pcp_list} onChange={(v) => setField('source_pcp_list', v)} disabled={isLocked} />
+            <CheckboxRow label="No Known Allergies (NKA)" checked={data.nka} onChange={(v) => setField('nka', v)} disabled={isLocked} />
           </div>
         </section>
-
+        
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-3">Allergies (Medication & Food)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(values.allergies || []).map((a, idx) => (
+            {(data.allergies || []).map((a, idx) => (
               <React.Fragment key={idx}>
                 <TextField label={`Allergy #${idx + 1}`} value={a.item} onChange={(v) => updateAllergy(idx, { item: v })} disabled={isLocked} />
                 <TextField label="Reaction" value={a.reaction} onChange={(v) => updateAllergy(idx, { reaction: v })} disabled={isLocked} />
@@ -194,13 +310,13 @@ export default function MedicationReconciliationForm() {
             ))}
           </div>
         </section>
-
+            
         <section className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-6">
             <h2 className="text-lg font-bold text-gray-900">Medication List (OTC, Herbals, Vitamins & Supplements)</h2>
             <p className="text-sm text-gray-600 mt-1">Do not use abbreviations. Enter what the patient actually takes.</p>
           </div>
-
+              
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-50">
@@ -216,7 +332,7 @@ export default function MedicationReconciliationForm() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {(values.meds || []).map((row, idx) => (
+                {(data.meds || []).map((row, idx) => (
                   <MedicationRow key={idx} idx={idx} row={row} onChange={(r) => updateMed(idx, r)} disabled={isLocked} />
                 ))}
               </tbody>
@@ -224,15 +340,15 @@ export default function MedicationReconciliationForm() {
           </div>
 
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TextField label="Medication History Verified by RN" value={values.med_history_verified_by_rn} onChange={(v) => setField('med_history_verified_by_rn', v)} disabled={isLocked} />
-            <TextField label="Date/Time" value={values.med_history_datetime} onChange={(v) => setField('med_history_datetime', v)} disabled={isLocked} placeholder="YYYY-MM-DD HH:MM" />
+            <TextField label="Medication History Verified by RN" value={data.med_history_verified_by_rn} onChange={(v) => setField('med_history_verified_by_rn', v)} disabled={isLocked} />
+            <TextField label="Date/Time" value={data.med_history_datetime} onChange={(v) => setField('med_history_datetime', v)} disabled={isLocked} placeholder="YYYY-MM-DD HH:MM" />
           </div>
         </section>
-
+    
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-3">Prescriptions Given Upon Discharge</h2>
           <div className="grid grid-cols-1 gap-3">
-            {(values.discharge_rx || []).map((rx, idx) => (
+            {(data.discharge_rx || []).map((rx, idx) => (
               <div key={idx} className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <input className="px-3 py-2 border border-gray-300 rounded-lg" value={rx.name || ''} onChange={(e) => updateRx(idx, { name: e.target.value })} disabled={isLocked} placeholder="Medication Name" />
                 <input className="px-3 py-2 border border-gray-300 rounded-lg" value={rx.dose || ''} onChange={(e) => updateRx(idx, { dose: e.target.value })} disabled={isLocked} placeholder="Dose" />
@@ -242,16 +358,16 @@ export default function MedicationReconciliationForm() {
               </div>
             ))}
           </div>
-
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <TextField label="Signature of Surgeon Reviewing Medications" value={values.surgeon_signature} onChange={(v) => setField('surgeon_signature', v)} disabled={isLocked} />
-            <TextField label="Discharge RN Signature" value={values.discharge_rn_signature} onChange={(v) => setField('discharge_rn_signature', v)} disabled={isLocked} />
-            <TextField label="Discharge Date/Time" value={values.discharge_datetime} onChange={(v) => setField('discharge_datetime', v)} disabled={isLocked} placeholder="YYYY-MM-DD HH:MM" />
+            <TextField label="Signature of Surgeon Reviewing Medications" value={data.surgeon_signature} onChange={(v) => setField('surgeon_signature', v)} disabled={isLocked} />
+            <TextField label="Discharge RN Signature" value={data.discharge_rn_signature} onChange={(v) => setField('discharge_rn_signature', v)} disabled={isLocked} />
+            <TextField label="Discharge Date/Time" value={data.discharge_datetime} onChange={(v) => setField('discharge_datetime', v)} disabled={isLocked} placeholder="YYYY-MM-DD HH:MM" />
           </div>
         </section>
-
+            
         <div className="text-xs text-gray-500 text-center">
-          Tip: If you want this to match the exact paper columns, we can tighten spacing and font to “form print” mode later.
+          Tip: If you want this to match the exact paper columns, we can tighten spacing and font to "form print" mode later.
         </div>
       </main>
     </div>

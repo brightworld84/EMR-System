@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
 export default function FallRiskAssessmentPreOpTesting() {
+  const navigate = useNavigate();
   const { checkinId } = useParams();
 
   // IMPORTANT: no leading slash, because api.js baseURL already ends with /api
@@ -12,7 +13,7 @@ export default function FallRiskAssessmentPreOpTesting() {
     () => ({
       age_band: "", // '60_69' | '70_79' | '80_plus'
       gender: "", // 'male' | 'female'
-      fall_within_6_months: false,
+      fall_within_3mo: false,
       high_risk_meds_count: "", // '1' | '2' | '3_plus'
       comorbid_count: "", // '1' | '2' | '3_plus'
       mobility_requires_assistance: false,
@@ -80,55 +81,55 @@ export default function FallRiskAssessmentPreOpTesting() {
   const computedTotal =
     agePoints(data.age_band) +
     genderPoints(data.gender) +
-    fallHistoryPoints(data.fall_within_6_months) +
+    fallHistoryPoints(data.fall_within_3mo) +
     medsPoints(data.high_risk_meds_count) +
     comorbidPoints(data.comorbid_count) +
     mobilityPoints() +
     homeO2Points(data.home_oxygen);
 
   // --- load existing record (if any) ---
-  useEffect(() => {
-    let mounted = true;
+  const loadOrCreate = async () => {
+    if (!checkinId) return;
 
-    async function load() {
-      if (!checkinId) return;
+    setError("");
+    setLoading(true);
 
-      setError("");
-      setLoading(true);
+    try {
+      const res = await api.get(`${ENDPOINT}/`, { params: { checkin: checkinId } });
 
-      try {
-        const res = await api.get(`${ENDPOINT}/`, { params: { checkin: checkinId } });
+      // DRF might return an array OR {results: []}
+      const list = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.results) ? res.data.results : [];
 
-        // DRF might return an array OR {results: []}
-        const list = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.results) ? res.data.results : [];
-        const first = list.length ? list[0] : null;
+      if (list.length > 0) {
+        const first = list[0];
+        setRecordId(first.id);
+        setData((prev) => ({
+          ...prev,
+          ...first,
+        }));
+      } else {
+        // Prevent duplicate POST in React strict mode
+        if (recordId) return;
 
-        if (!mounted) return;
-
-        if (first?.id) {
-          setRecordId(first.id);
-          setData((prev) => ({
-            ...prev,
-            ...first,
-          }));
-        } else {
-          setRecordId(null);
-          setData(defaults);
-        }
-      } catch (e) {
-        console.error("FallRiskAssessmentPreOpTesting load failed:", e);
-        if (!mounted) return;
-        setError("Failed to load this form from the server.");
-      } finally {
-        if (mounted) setLoading(false);
+        const created = await api.post(`${ENDPOINT}/`, { checkin: Number(checkinId) });
+        setRecordId(created.data.id);
+        setData((prev) => ({
+          ...prev,
+          ...created.data,
+        }));
       }
+    } catch (e) {
+      console.error("FallRiskAssessmentPreOpTesting load failed:", e);
+      setError("Failed to load this form from the server.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [checkinId, ENDPOINT, defaults]);
+  useEffect(() => {
+    loadOrCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkinId]);
 
   const onSave = async () => {
     if (!checkinId) return;
@@ -149,6 +150,7 @@ export default function FallRiskAssessmentPreOpTesting() {
         const created = await api.post(`${ENDPOINT}/`, payload);
         if (created?.data?.id) setRecordId(created.data.id);
       }
+      alert('Saved.');
     } catch (e) {
       console.error("FallRiskAssessmentPreOpTesting save failed:", e);
       setError("Failed to save. Please try again.");
@@ -158,181 +160,209 @@ export default function FallRiskAssessmentPreOpTesting() {
   };
 
   return (
-    <div style={styles.page}>
-      <h2 style={styles.title}>Fall Risk Assessment — Pre-Op Testing</h2>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow print:hidden">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Fall Risk Assessment — Pre-Op Testing</h1>
+            <p className="text-sm text-gray-600">Check-in #{checkinId}</p>
+          </div>
 
-      {loading ? <p>Loading…</p> : null}
-      {error ? <p style={styles.error}>{error}</p> : null}
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
+              ← Back
+            </button>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Age (single-select)</h3>
-        <RadioRow
-          name="age_band"
-          value={data.age_band}
-          onChange={(v) => setField("age_band", v)}
-          options={[
-            { value: "60_69", label: "60–69 (1 point)" },
-            { value: "70_79", label: "70–79 (2 points)" },
-            { value: "80_plus", label: "≥ 80 (3 points)" },
-          ]}
-        />
-      </div>
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black font-semibold"
+            >
+              Print / PDF
+            </button>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Gender</h3>
-        <RadioRow
-          name="gender"
-          value={data.gender}
-          onChange={(v) => setField("gender", v)}
-          options={[
-            { value: "male", label: "Male (2 points)" },
-            { value: "female", label: "Female (1 point)" },
-          ]}
-        />
-      </div>
+            <button
+              onClick={onSave}
+              disabled={loading || saving}
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold disabled:bg-gray-300"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </header>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Fall History</h3>
-        <Checkbox
-          checked={!!data.fall_within_6_months}
-          onChange={(v) => setField("fall_within_6_months", v)}
-          label="One fall within past 6 months — accidental trips/falls/balance issues (20 points)"
-        />
-      </div>
+      {/* Main Content */}
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        {loading ? (
+          <div className="bg-white rounded-lg shadow p-10 text-center text-gray-600">Loading…</div>
+        ) : (
+          <div className="space-y-6">
+            {error ? <p className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</p> : null}
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Medication in last 24 hours (high fall risk meds)</h3>
-        <RadioRow
-          name="high_risk_meds_count"
-          value={data.high_risk_meds_count}
-          onChange={(v) => setField("high_risk_meds_count", v)}
-          options={[
-            { value: "1", label: "On 1 high fall risk medication (1 point)" },
-            { value: "2", label: "On 2 high fall risk medications (3 points)" },
-            { value: "3_plus", label: "On 3 or more high fall risk medications (5 points)" },
-          ]}
-        />
-      </div>
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Age (single-select)</h3>
+                <RadioRow
+                  name="age_band"
+                  value={data.age_band}
+                  onChange={(v) => setField("age_band", v)}
+                  options={[
+                    { value: "60_69", label: "60–69 (1 point)" },
+                    { value: "70_79", label: "70–79 (2 points)" },
+                    { value: "80_plus", label: "≥ 80 (3 points)" },
+                  ]}
+                />
+              </div>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Current co-morbid conditions</h3>
-        <RadioRow
-          name="comorbid_count"
-          value={data.comorbid_count}
-          onChange={(v) => setField("comorbid_count", v)}
-          options={[
-            { value: "1", label: "1 co-morbid condition (5 points)" },
-            { value: "2", label: "2 co-morbid conditions (10 points)" },
-            { value: "3_plus", label: "3 or more co-morbid conditions (15 points)" },
-          ]}
-        />
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Gender</h3>
+                <RadioRow
+                  name="gender"
+                  value={data.gender}
+                  onChange={(v) => setField("gender", v)}
+                  options={[
+                    { value: "male", label: "Male (2 points)" },
+                    { value: "female", label: "Female (1 point)" },
+                  ]}
+                />
+              </div>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Mobility (multi-select)</h3>
-        <Checkbox
-          checked={!!data.mobility_requires_assistance}
-          onChange={(v) => setField("mobility_requires_assistance", v)}
-          label="Requires assistance/supervision for mobility, transfer, or ambulation (10 points)"
-        />
-        <Checkbox
-          checked={!!data.mobility_unsteady_gait}
-          onChange={(v) => setField("mobility_unsteady_gait", v)}
-          label="Unsteady gait (10 points)"
-        />
-        <Checkbox
-          checked={!!data.mobility_visual_impairment}
-          onChange={(v) => setField("mobility_visual_impairment", v)}
-          label="Visual impairment affecting mobility (5 points)"
-        />
-        <Checkbox
-          checked={!!data.mobility_auditory_impairment}
-          onChange={(v) => setField("mobility_auditory_impairment", v)}
-          label="Auditory impairment affecting mobility (2 points)"
-        />
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Fall History</h3>
+                <Checkbox
+                  checked={!!data.fall_within_3mo}
+                  onChange={(v) => setField("fall_within_3mo", v)}
+                  label="One fall within past 3 months — accidental trips/falls/balance issues (20 points)"
+                />
+              </div>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Home Oxygen</h3>
-        <RadioRow
-          name="home_oxygen"
-          value={data.home_oxygen}
-          onChange={(v) => setField("home_oxygen", v)}
-          options={[
-            { value: "yes", label: "Yes (1 point)" },
-            { value: "no", label: "No (0 points)" },
-          ]}
-        />
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Medication in last 24 hours (high fall risk meds)</h3>
+                <RadioRow
+                  name="high_risk_meds_count"
+                  value={data.high_risk_meds_count}
+                  onChange={(v) => setField("high_risk_meds_count", v)}
+                  options={[
+                    { value: "1", label: "On 1 high fall risk medication (1 point)" },
+                    { value: "2", label: "On 2 high fall risk medications (3 points)" },
+                    { value: "3_plus", label: "On 3 or more high fall risk medications (5 points)" },
+                  ]}
+                />
+              </div>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Pre-Assessment Point Total</h3>
-        <p style={styles.totalBox}>{computedTotal} points</p>
-        <p style={styles.note}>
-          Implement High Risk Fall Precautions for any patient with a fall history in the last 6 months or an assessment
-          score of &gt; 20 points.
-        </p>
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Current co-morbid conditions</h3>
+                <RadioRow
+                  name="comorbid_count"
+                  value={data.comorbid_count}
+                  onChange={(v) => setField("comorbid_count", v)}
+                  options={[
+                    { value: "1", label: "1 co-morbid condition (5 points)" },
+                    { value: "2", label: "2 co-morbid conditions (10 points)" },
+                    { value: "3_plus", label: "3 or more co-morbid conditions (15 points)" },
+                  ]}
+                />
+              </div>
 
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Pre-admission Nurse</h3>
-        <input
-          style={styles.input}
-          value={data.pre_admission_nurse_name || ""}
-          onChange={(e) => setField("pre_admission_nurse_name", e.target.value)}
-          placeholder="Pre-admission Nurse name"
-        />
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Mobility (multi-select)</h3>
+                <div className="space-y-2">
+                  <Checkbox
+                    checked={!!data.mobility_requires_assistance}
+                    onChange={(v) => setField("mobility_requires_assistance", v)}
+                    label="Requires assistance/supervision for mobility, transfer, or ambulation (10 points)"
+                  />
+                  <Checkbox
+                    checked={!!data.mobility_unsteady_gait}
+                    onChange={(v) => setField("mobility_unsteady_gait", v)}
+                    label="Unsteady gait (10 points)"
+                  />
+                  <Checkbox
+                    checked={!!data.mobility_visual_impairment}
+                    onChange={(v) => setField("mobility_visual_impairment", v)}
+                    label="Visual impairment affecting mobility (5 points)"
+                  />
+                  <Checkbox
+                    checked={!!data.mobility_auditory_impairment}
+                    onChange={(v) => setField("mobility_auditory_impairment", v)}
+                    label="Auditory impairment affecting mobility (2 points)"
+                  />
+                </div>
+              </div>
 
-      <div style={styles.actions}>
-        <button style={styles.saveBtn} onClick={onSave} disabled={saving || loading}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Home Oxygen</h3>
+                <RadioRow
+                  name="home_oxygen"
+                  value={data.home_oxygen}
+                  onChange={(v) => setField("home_oxygen", v)}
+                  options={[
+                    { value: "yes", label: "Yes (1 point)" },
+                    { value: "no", label: "No (0 points)" },
+                  ]}
+                />
+              </div>
+
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Pre-Assessment Point Total</h3>
+                <div className="inline-block px-6 py-3 bg-blue-50 border-2 border-blue-600 rounded-lg">
+                  <span className="text-2xl font-bold text-blue-900">{computedTotal} points</span>
+                </div>
+                <p className="mt-4 text-sm text-gray-700">
+                  <strong>Note:</strong> Implement High Risk Fall Precautions for any patient with a fall history in the last 3 months or an assessment score of &gt; 20 points.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Pre-admission Nurse</label>
+                <input
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  value={data.pre_admission_nurse_name || ""}
+                  onChange={(e) => setField("pre_admission_nurse_name", e.target.value)}
+                  placeholder="Pre-admission Nurse name"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
 
 function Checkbox({ checked, onChange, label }) {
   return (
-    <label style={styles.row}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span style={styles.label}>{label}</span>
+    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+      <input 
+        type="checkbox" 
+        checked={checked} 
+        onChange={(e) => onChange(e.target.checked)} 
+        className="h-4 w-4"
+      />
+      <span>{label}</span>
     </label>
   );
 }
 
 function RadioRow({ name, value, onChange, options }) {
   return (
-    <div style={{ marginTop: 6 }}>
+    <div className="space-y-2">
       {options.map((opt) => (
-        <label key={opt.value} style={styles.row}>
-          <input type="radio" name={name} checked={value === opt.value} onChange={() => onChange(opt.value)} />
-          <span style={styles.label}>{opt.label}</span>
+        <label key={opt.value} className="inline-flex items-center gap-2 text-sm text-gray-700 mr-6">
+          <input 
+            type="radio" 
+            name={name} 
+            checked={value === opt.value} 
+            onChange={() => onChange(opt.value)} 
+            className="h-4 w-4"
+          />
+          <span>{opt.label}</span>
         </label>
       ))}
     </div>
   );
 }
-
-const styles = {
-  page: { padding: 20, maxWidth: 900, margin: "0 auto" },
-  title: { marginBottom: 12 },
-  section: { border: "1px solid #ddd", borderRadius: 8, padding: 14, marginBottom: 12 },
-  sectionTitle: { margin: 0, marginBottom: 8, fontSize: 16 },
-  row: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 },
-  label: { lineHeight: "20px" },
-  input: { width: "100%", padding: 10, borderRadius: 6, border: "1px solid #bbb" },
-  actions: { display: "flex", justifyContent: "flex-end", marginTop: 10 },
-  saveBtn: { padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer" },
-  error: { color: "crimson" },
-  totalBox: {
-    display: "inline-block",
-    padding: "10px 14px",
-    border: "1px solid #bbb",
-    borderRadius: 8,
-    fontWeight: 700,
-    margin: 0,
-  },
-  note: { marginTop: 10, marginBottom: 0, color: "#444" },
-};

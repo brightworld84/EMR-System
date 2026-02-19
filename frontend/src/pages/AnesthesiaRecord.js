@@ -283,14 +283,14 @@ export default function AnesthesiaRecord() {
     setError("");
     setLoading(true);
 
-    try {
-      const res = await api.get(`/anesthesia-record/?checkin=${checkinId}`);
-      const list = res.data || [];
-      if (list.length > 0) {
+    if (list.length > 0) {
         const rec = list[0];
         setRecordId(rec.id);
         setData((prev) => ({ ...prev, ...unpackFromApi(rec) }));
       } else {
+        // Prevent duplicate POST in React strict mode
+        if (recordId) return;
+        
         // Create minimal record
         const payload = {
           checkin: Number(checkinId),
