@@ -5,13 +5,13 @@ import { statusLabel, statusPillClass } from '../utils/status';
 
 const STATUS_ORDER = ['checked_in', 'roomed', 'ready', 'in_progress', 'completed'];
 
-// Disable invalid transitions
+// ✅ ALLOW ALL TRANSITIONS - users can move freely between statuses
 const NEXT_ALLOWED = {
-  checked_in: new Set(['roomed']),
-  roomed: new Set(['ready', 'in_progress', 'completed']), // some clinics skip "ready"
-  ready: new Set(['in_progress', 'completed']),
-  in_progress: new Set(['completed']),
-  completed: new Set([]),
+  checked_in: new Set(['roomed', 'ready', 'in_progress', 'completed']),
+  roomed: new Set(['checked_in', 'ready', 'in_progress', 'completed']),
+  ready: new Set(['checked_in', 'roomed', 'in_progress', 'completed']),
+  in_progress: new Set(['checked_in', 'roomed', 'ready', 'completed']),
+  completed: new Set(['checked_in', 'roomed', 'ready', 'in_progress']),
 };
 
 function formatDuration(ms) {
@@ -39,7 +39,7 @@ function LivePatients() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // “time-in-status” ticker
+  // "time-in-status" ticker
   const [nowTick, setNowTick] = useState(Date.now());
 
   const fetchClinicConfig = async () => {
@@ -105,26 +105,27 @@ function LivePatients() {
     }
   };
 
-  const statusLabel = (status) => labels[status] || status || '—';
+  const statusLabelText = (status) => labels[status] || status || '—';
 
-  // 1️⃣ Status color pills
+  // Status color pills
   const statusBadge = (status) => {
     const base = "inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold";
-    if (status === 'checked_in') return `${base} bg-orange-100 text-orange-800`; // orange
-    if (status === 'roomed') return `${base} bg-blue-100 text-blue-800`;         // blue
+    if (status === 'checked_in') return `${base} bg-orange-100 text-orange-800`;
+    if (status === 'roomed') return `${base} bg-blue-100 text-blue-800`;
     if (status === 'ready') return `${base} bg-purple-100 text-purple-800`;
     if (status === 'in_progress') return `${base} bg-yellow-100 text-yellow-900`;
-    if (status === 'completed') return `${base} bg-green-100 text-green-800`;    // green
+    if (status === 'completed') return `${base} bg-green-100 text-green-800`;
     return `${base} bg-gray-100 text-gray-700`;
   };
 
-  // 2️⃣ Disable invalid transitions
+  // ✅ Can now go to any status from any status (except current status)
   const canGoTo = (currentStatus, targetStatus) => {
     if (!currentStatus) return false;
+    if (currentStatus === targetStatus) return false; // Can't transition to same status
     return NEXT_ALLOWED[currentStatus]?.has(targetStatus) || false;
   };
 
-  // 3️⃣ Time-in-status (uses status_changed_at if present)
+  // Time-in-status (uses status_changed_at if present)
   const timeInStatus = (row) => {
     const start = row.status_changed_at || row.check_in_time;
     if (!start) return '—';
@@ -229,21 +230,30 @@ function LivePatients() {
                   <td className="px-6 py-4 text-sm text-gray-900">{c.assigned_staff_name || '—'}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">{c.provider_name || '—'}</td>
 
-                  {/* ✅ Status (pill + buttons IN THIS SAME COLUMN) */}
+                  {/* ✅ Status (pill + ALL buttons including "Checked In") */}
                   <td className="px-6 py-4 text-sm">
                     <div className="flex flex-col gap-2">
                     <span
                       className={statusPillClass(c.status)}
                       title={
                         c.status_changed_at
-                        ? `${statusLabel(c.status)} at ${new Date(c.status_changed_at).toLocaleTimeString()}`
-                        : statusLabel(c.status)
+                        ? `${statusLabelText(c.status)} at ${new Date(c.status_changed_at).toLocaleTimeString()}`
+                        : statusLabelText(c.status)
                       }
                     >
                       {statusLabel(c.status, labels)}
                     </span>
 
                     <div className="flex flex-wrap gap-2">
+                      {/* ✅ Added "Checked In" button - can now go back */}
+                      <button
+                        onClick={() => setStatus(c.id, 'checked_in')}
+                        disabled={!canGoTo(c.status, 'checked_in')}
+                        className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold disabled:bg-orange-200 disabled:text-orange-700"
+                      >
+                        {labels.checked_in}
+                      </button>
+
                       <button
                         onClick={() => setStatus(c.id, 'roomed')}
                         disabled={!canGoTo(c.status, 'roomed')}
