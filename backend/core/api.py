@@ -8,11 +8,10 @@ def clinic_config(request):
     clinic = request.user.clinic
 
     defaults = {
-        "checked_in": "Checked In",
-        "roomed": "Roomed",
-        "ready": "Ready",
-        "in_progress": "In Progress",
-        "completed": "Complete",
+    "pre_op": "Pre-Op",
+    "operating_room": "Operating Room",
+    "pacu": "PACU", 
+    "discharged": "Discharged",
     }
 
     labels = defaults.copy()

@@ -10,9 +10,9 @@ from scheduling.models import Appointment, PatientCheckIn
 
 ALERT_THRESHOLDS_MINUTES = {
     'checked_in': 15,
-    'roomed': 20,
-    'ready': 20,
-    'in_progress': 60,
+    'pre_op': 30,
+    'operating_room': 90,
+    'pacu': 45,
 }
 
 def minutes_between(a, b):

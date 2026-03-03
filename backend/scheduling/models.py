@@ -1150,10 +1150,8 @@ class Appointment(models.Model):
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
         ('checked_in', 'Checked In'),
-        ('roomed', 'Roomed'),
-        ('ready', 'Ready'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
+        ('in_progress', 'In Progress'),  # patient is in the facility
+        ('completed', 'Completed'),       # case is done, appointment closed
         ('cancelled', 'Cancelled'),
         ('no_show', 'No Show'),
     ]

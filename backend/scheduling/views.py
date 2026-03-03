@@ -83,14 +83,15 @@ def _apply_checkin_status_transition(*, checkin, new_status, actor):
     checkin.status_changed_at = now
 
     # Stage timestamps (only set once)
-    if new_status == 'roomed' and checkin.roomed_at is None:
-        checkin.roomed_at = now
-    if new_status == 'ready' and checkin.ready_at is None:
-        checkin.ready_at = now
-    if new_status == 'in_progress' and checkin.in_progress_at is None:
-        checkin.in_progress_at = now
-    if new_status == 'completed' and checkin.completed_at is None:
-        checkin.completed_at = now
+    if new_status == 'pre_op' and checkin.pre_op_at is None:
+        checkin.pre_op_at = now
+    if new_status == 'operating_room' and checkin.operating_room_at is None:
+        checkin.operating_room_at = now
+    if new_status == 'pacu' and checkin.pacu_at is None:
+        checkin.pacu_at = now
+    if new_status == 'discharged' and checkin.discharged_at is None:
+        checkin.discharged_at = now
+
 
     checkin.save()
 
@@ -115,14 +116,14 @@ def _apply_checkin_status_transition(*, checkin, new_status, actor):
     checkin.status_changed_at = now
 
     # Stage timestamps (set once)
-    if new_status == 'roomed' and checkin.roomed_at is None:
-        checkin.roomed_at = now
-    elif new_status == 'ready' and checkin.ready_at is None:
-        checkin.ready_at = now
-    elif new_status == 'in_progress' and checkin.in_progress_at is None:
-        checkin.in_progress_at = now
-    elif new_status == 'completed' and checkin.completed_at is None:
-        checkin.completed_at = now
+    if new_status == 'pre_op' and checkin.pre_op_at is None:
+        checkin.pre_op_at = now
+    elif new_status == 'operating_room' and checkin.operating_room_at is None:
+        checkin.operating_room_at = now
+    elif new_status == 'pacu' and checkin.pacu_at is None:
+        checkin.pacu_at = now
+    elif new_status == 'discharged' and checkin.discharged_at is None:
+        checkin.discharged_at = now
 
     checkin.save()
 
@@ -285,7 +286,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         end_dt = start_dt + timedelta(minutes=duration_minutes)
 
         clinic = request.user.clinic
-        active_statuses = ['scheduled', 'checked_in', 'roomed', 'ready', 'in_progress']
+        active_statuses = ['scheduled', 'checked_in', 'pre_op', 'operating_room', 'pacu']
 
         # --- Duplicate check: same patient same day ---
         dup_qs = Appointment.objects.filter(
@@ -507,7 +508,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         obj = self.get_object()
 
-        obj.status = 'completed'
+        obj.status = 'discharged'
         obj.status_changed_at = timezone.now()
         obj.is_active = False
         obj.check_out_time = timezone.now()
@@ -515,7 +516,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
 
         # ✅ Sync appointment status if linked
         if obj.appointment_id:
-            obj.appointment.status = 'completed'
+            obj.appointment.status = 'discharged'
             obj.appointment.save(update_fields=['status'])
 
         AuditLog.log_action(
@@ -523,7 +524,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             action='update',
             resource_type='checkin',
             resource_id=str(obj.id),
-            changes={'status': 'completed', 'is_active': False, 'appointment_synced': bool(obj.appointment_id)},
+            changes={'status': 'discharged', 'is_active': False, 'appointment_synced': bool(obj.appointment_id)},
             ip_address=request.META.get('REMOTE_ADDR', ''),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
         )
