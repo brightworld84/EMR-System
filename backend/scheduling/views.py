@@ -486,11 +486,20 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             new_status=new_status,
             actor=request.user
         )
-
         # ✅ Sync appointment status if linked
+        # Map PatientCheckIn statuses to valid Appointment statuses
+        APPT_STATUS_MAP = {
+            'checked_in':     'checked_in',
+            'pre_op':         'in_progress',
+            'operating_room': 'in_progress',
+            'pacu':           'in_progress',
+            'discharged':     'completed',
+        }
         if obj.appointment_id:
-            obj.appointment.status = new_status
+            appt_status = APPT_STATUS_MAP.get(new_status, 'in_progress')
+            obj.appointment.status = appt_status
             obj.appointment.save(update_fields=['status'])
+
 
         AuditLog.log_action(
             user=request.user,
