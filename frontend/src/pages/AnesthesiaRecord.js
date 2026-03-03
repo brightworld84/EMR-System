@@ -417,26 +417,36 @@ export default function AnesthesiaRecord() {
   if (loading) return <div className="p-6">Loading…</div>;
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Anesthesia Record</h1>
-        <div className="flex gap-2">
-          <button
-            className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-            onClick={saveDraft}
-            disabled={saving || !recordId}
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-          <button
-            className="px-4 py-2 rounded bg-green-600 text-white"
-            onClick={signRecord}
-            disabled={!recordId}
-          >
-            Sign
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow print:hidden">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Anesthesia Record</h1>
+            <p className="text-sm text-gray-600">
+              Check-in #{checkinId}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50 font-semibold"
+              onClick={saveDraft}
+              disabled={saving || !recordId}
+            >
+              {saving ? "Saving…" : "Save Draft"}
+            </button>
+            <button
+              className="px-4 py-2 rounded bg-green-600 text-white font-semibold"
+              onClick={signRecord}
+              disabled={!recordId}
+            >
+              Sign & Lock
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
 
       {error ? (
         <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200">{error}</div>
@@ -490,5 +500,6 @@ export default function AnesthesiaRecord() {
 
       {/* You will keep your full chart/antibiotics/premed/regional UI as you had it. */}
     </main>
+  </div>
   );
 }
