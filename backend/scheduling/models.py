@@ -694,17 +694,16 @@ class AnesthesiaRecord(models.Model):
     )
 
     # Structured sections (paper has many grouped areas + large grids)
-    header = models.JSONField(default=dict, blank=True)          # date/time, ASA class, NPO status, etc.
-    history = models.TextField(blank=True, default='')
-    ros = models.TextField(blank=True, default='')
-    meds = models.TextField(blank=True, default='')
-    pe = models.TextField(blank=True, default='')
-
-    airway = models.JSONField(default=dict, blank=True)          # ETT/LMA/teeth/oral-nasal, attempts, etc.
-    plan = models.TextField(blank=True, default='')              # diagnosis/plan block
-    time_series = models.JSONField(default=list, blank=True)     # the big time grid rows/cols
-    regional_anesthesia = models.JSONField(default=dict, blank=True)  # regional procedure block (bottom right)
-    notes = models.TextField(blank=True, default='')
+    header = models.JSONField(default=dict, blank=True)
+    history = models.JSONField(default=dict, blank=True)
+    ros = models.JSONField(default=dict, blank=True)
+    meds = models.JSONField(default=dict, blank=True)
+    pe = models.JSONField(default=dict, blank=True)
+    airway = models.JSONField(default=dict, blank=True)
+    plan = models.JSONField(default=dict, blank=True)
+    time_series = models.JSONField(default=list, blank=True)
+    regional_anesthesia = models.JSONField(default=dict, blank=True)
+    notes = models.JSONField(default=dict, blank=True)
 
     # Signature + lock
     is_signed = models.BooleanField(default=False)
