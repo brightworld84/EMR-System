@@ -283,7 +283,11 @@ export default function AnesthesiaRecord() {
     setError("");
     setLoading(true);
 
-    if (list.length > 0) {
+    try {
+      const res = await api.get(`/anesthesia-record/?checkin=${checkinId}`);
+      const list = res.data || [];
+
+      if (list.length > 0) {
         const rec = list[0];
         setRecordId(rec.id);
         setData((prev) => ({ ...prev, ...unpackFromApi(rec) }));
