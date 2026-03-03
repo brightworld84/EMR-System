@@ -1210,10 +1210,10 @@ class PatientCheckIn(models.Model):
     """
     STATUS_CHOICES = [
         ('checked_in', 'Checked In'),
-        ('roomed', 'Roomed'),
-        ('ready', 'Ready'),
-        ('in_progress', 'In Progress'),
-        ('completed', 'Completed'),
+        ('pre_op', 'Pre-Op'),
+        ('operating_room', 'Operating Room'),
+        ('pacu', 'PACU'),
+        ('discharged', 'Discharged'),
     ]
 
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE)
@@ -1238,10 +1238,10 @@ class PatientCheckIn(models.Model):
     provider_name = models.CharField(max_length=200, blank=True, default='')
 
     status_changed_at = models.DateTimeField(default=timezone.now)
-    roomed_at = models.DateTimeField(null=True, blank=True)
-    ready_at = models.DateTimeField(null=True, blank=True)
-    in_progress_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
+    pre_op_at = models.DateTimeField(null=True, blank=True)
+    operating_room_at = models.DateTimeField(null=True, blank=True)
+    pacu_at = models.DateTimeField(null=True, blank=True)
+    discharged_at = models.DateTimeField(null=True, blank=True)
 
     check_in_time = models.DateTimeField(auto_now_add=True)
     check_out_time = models.DateTimeField(null=True, blank=True)
