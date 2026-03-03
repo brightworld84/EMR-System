@@ -230,52 +230,91 @@ function PatientDetail() {
 
   // Render form buttons for a check-in
   const renderFormButtons = (checkin) => {
-    const formButtons = [
-      { label: 'Pre-Op Phone Call', path: `/checkins/${checkin.id}/pre-op-phone-call`, color: 'emerald' },
-      { label: 'Fall Risk (Pre-Op Testing)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop-testing`, color: 'emerald' },
-      { label: 'Fall Risk (Pre-Operative)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop`, color: 'emerald' },
-      { label: 'Pre-Op Nurse Notes', path: `/checkins/${checkin.id}/preoperative-nurses-notes`, color: 'emerald' },
-      { label: 'History & Physical', path: `/checkins/${checkin.id}/history-and-physical`, color: 'emerald' },
-      { label: 'Consent for Anesthesia', path: `/checkins/${checkin.id}/consent-for-anesthesia-services`, color: 'emerald' },
-      { label: 'Anesthesia Orders', path: `/checkins/${checkin.id}/anesthesia-orders`, color: 'emerald' },
-      { label: 'Peripheral Nerve Block', path: `/checkins/${checkin.id}/peripheral-nerve-block-procedure-note`, color: 'emerald' },
-      { label: 'Medication Reconciliation', path: `/checkins/${checkin.id}/medication-reconciliation`, color: 'emerald' },
-      { label: 'Operating Room Record', path: `/checkins/${checkin.id}/operating-room-record`, color: 'emerald' },
-      { label: 'Anesthesia Record', path: `/checkins/${checkin.id}/anesthesia-record`, color: 'emerald' },
-      { label: 'Immediate Post-Op Note', path: `/checkins/${checkin.id}/immediate-postop-progress-note`, color: 'indigo' },
-      { label: 'PACU Record', path: `/checkins/${checkin.id}/pacu-record`, color: 'emerald' },
-      { label: 'PACU Mobility Assessment', path: `/checkins/${checkin.id}/pacu-mobility`, color: 'blue' },
-      { label: 'PACU Additional Notes', path: `/checkins/${checkin.id}/pacu-additional-nursing-notes`, color: 'indigo' },
-      { label: 'Exparel Billing', path: `/checkins/${checkin.id}/exparel-billing-worksheet`, color: 'emerald' },
-      { label: 'Implant / Billable Info', path: `/checkins/${checkin.id}/implant-billable-information`, color: 'emerald' },
-      { label: 'Post-Op Phone Call', path: `/checkins/${checkin.id}/post-operative-phone-call`, color: 'indigo' },
-      { label: 'Infection Education', path: `/checkins/${checkin.id}/post-op-infection-education`, color: 'indigo' },
-      { label: 'DVT/PE Education', path: `/checkins/${checkin.id}/dvt-pe-education`, color: 'indigo' },
-      { label: 'Patient Instructions', path: `/checkins/${checkin.id}/patient-instructions`, color: 'gray' },
+    const stages = [
+      {
+        label: 'Check In',
+        color: 'orange',
+        btnClass: 'bg-orange-600 hover:bg-orange-700',
+        dotClass: 'bg-orange-400',
+        textClass: 'text-orange-700',
+        forms: [
+          { label: 'Medication Reconciliation', path: `/checkins/${checkin.id}/medication-reconciliation` },
+          { label: 'DVT/PE Education', path: `/checkins/${checkin.id}/dvt-pe-education` },
+          { label: 'Infection Education', path: `/checkins/${checkin.id}/post-op-infection-education` },
+          { label: 'Consent for Anesthesia', path: `/checkins/${checkin.id}/consent-for-anesthesia-services` },
+        ],
+      },
+      {
+        label: 'Pre-Op',
+        color: 'blue',
+        btnClass: 'bg-blue-600 hover:bg-blue-700',
+        dotClass: 'bg-blue-400',
+        textClass: 'text-blue-700',
+        forms: [
+          { label: 'Pre-Op Phone Call', path: `/checkins/${checkin.id}/pre-op-phone-call` },
+          { label: 'Patient Instructions', path: `/checkins/${checkin.id}/patient-instructions` },
+          { label: 'History & Physical', path: `/checkins/${checkin.id}/history-and-physical` },
+          { label: 'Fall Risk (Pre-Op Testing)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop-testing` },
+          { label: 'Fall Risk (Pre-Operative)', path: `/checkins/${checkin.id}/fall-risk-assessment-preop` },
+          { label: 'Pre-Op Nurse Notes', path: `/checkins/${checkin.id}/preoperative-nurses-notes` },
+        ],
+      },
+      {
+        label: 'Operating Room',
+        color: 'red',
+        btnClass: 'bg-red-600 hover:bg-red-700',
+        dotClass: 'bg-red-400',
+        textClass: 'text-red-700',
+        forms: [
+          { label: 'Anesthesia Orders', path: `/checkins/${checkin.id}/anesthesia-orders` },
+          { label: 'Peripheral Nerve Block', path: `/checkins/${checkin.id}/peripheral-nerve-block-procedure-note` },
+          { label: 'Operating Room Record', path: `/checkins/${checkin.id}/operating-room-record` },
+          { label: 'Anesthesia Record', path: `/checkins/${checkin.id}/anesthesia-record` },
+          { label: 'Exparel Billing', path: `/checkins/${checkin.id}/exparel-billing-worksheet` },
+          { label: 'Implant / Billable Info', path: `/checkins/${checkin.id}/implant-billable-information` },
+        ],
+      },
+      {
+        label: 'PACU',
+        color: 'yellow',
+        btnClass: 'bg-yellow-600 hover:bg-yellow-700',
+        dotClass: 'bg-yellow-400',
+        textClass: 'text-yellow-700',
+        forms: [
+          { label: 'Immediate Post-Op Note', path: `/checkins/${checkin.id}/immediate-postop-progress-note` },
+          { label: 'PACU Record', path: `/checkins/${checkin.id}/pacu-record` },
+          { label: 'PACU Additional Notes', path: `/checkins/${checkin.id}/pacu-additional-nursing-notes` },
+          { label: 'PACU Mobility Assessment', path: `/checkins/${checkin.id}/pacu-mobility` },
+          { label: 'Post-Op Phone Call', path: `/checkins/${checkin.id}/post-operative-phone-call` },
+        ],
+      },
     ];
 
     return (
-      <div className="flex flex-wrap gap-2">
-        {formButtons.map((btn, idx) => {
-          const colorClass = 
-            btn.color === 'emerald' ? 'bg-emerald-700 hover:bg-emerald-800' :
-            btn.color === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-700' :
-            btn.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
-            'bg-gray-900 hover:bg-black';
-
-          return (
-            <button
-              key={idx}
-              onClick={() => navigate(btn.path)}
-              className={`px-3 py-2 ${colorClass} text-white rounded-lg text-sm font-semibold`}
-            >
-              {btn.label}
-            </button>
-          );
-        })}
+      <div className="space-y-4 mt-4">
+        {stages.map((stage) => (
+          <div key={stage.label} className="border border-gray-100 rounded-lg p-4">
+            <h4 className={`text-sm font-bold mb-3 flex items-center gap-2 ${stage.textClass}`}>
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${stage.dotClass}`}></span>
+              {stage.label}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {stage.forms.map((btn) => (
+                <button
+                  key={btn.path}
+                  onClick={() => navigate(btn.path)}
+                  className={`px-3 py-2 ${stage.btnClass} text-white rounded-lg text-sm font-semibold`}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
+
 
   if (loading) {
     return (
@@ -439,212 +478,13 @@ function PatientDetail() {
                   </div>
                   
                   {/* Surgery Forms */}
-                  <section>
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-lg font-bold text-gray-900">Surgery Forms</h2>
-                      <span className="text-xs text-gray-500">Requires active check-in</span>
-                    </div>
+                  {renderFormButtons(checkin)}
 
-                    {checkinError && (
-                      <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                        {checkinError}
-                      </div>
-                    )}
-
-                    {checkinLoading ? (
-                      <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-                        Loading active check-in…
-                      </div>
-                    ) : !activeCheckin ? (
-                      <div className="bg-white rounded-lg shadow p-6 text-gray-600">
-                        No active check-in for this patient right now.
-                        <div className="text-xs text-gray-500 mt-2">
-                          Forms become available after the patient is checked in.
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-
-                        {/* Check In status bar */}
-                        <div className="bg-white rounded-lg shadow px-6 py-3 flex items-center gap-4 text-sm text-gray-600">
-                          <span>Check-in ID: <strong>{activeCheckin.id}</strong></span>
-                          <span>Status: <strong>{activeCheckin.status || '—'}</strong></span>
-                          <span>Checked in: <strong>{activeCheckin.check_in_time ? new Date(activeCheckin.check_in_time).toLocaleString() : '—'}</strong></span>
-                        </div>
-
-                        {/* CHECK IN */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <h3 className="text-md font-bold text-orange-700 mb-4 flex items-center gap-2">
-                            <span className="inline-block w-3 h-3 rounded-full bg-orange-400"></span>
-                              Check In
-                          </h3>
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/medication-reconciliation`)}
-                              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
-                            >
-                              Medication Reconciliation
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/dvt-pe-education`)}
-                              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
-                            >
-                              DVT/PE Education
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/post-op-infection-education`)}
-                              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
-                            >
-                              Infection Education
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/consent-for-anesthesia-services`)}
-                              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
-                            >
-                              Consent for Anesthesia Services
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* PRE-OP */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <h3 className="text-md font-bold text-blue-700 mb-4 flex items-center gap-2">
-                            <span className="inline-block w-3 h-3 rounded-full bg-blue-400"></span>
-                            Pre-Op
-                          </h3>
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/pre-op-phone-call`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              Pre-Op Phone Call
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/patient-instructions`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              Patient Instructions
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/history-and-physical`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              History & Physical
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/fall-risk-assessment-preop-testing`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              Fall Risk (Pre-Op Testing)
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/fall-risk-assessment-preop`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              Fall Risk (Pre-Operative)
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/preoperative-nurses-notes`)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                            >
-                              Pre-Op Nurse Notes (Pg 1)
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* OPERATING ROOM */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <h3 className="text-md font-bold text-red-700 mb-4 flex items-center gap-2">
-                            <span className="inline-block w-3 h-3 rounded-full bg-red-400"></span>
-                            Operating Room
-                          </h3>
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/anesthesia-orders`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Anesthesia Orders
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/peripheral-nerve-block-procedure-note`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Peripheral Nerve Block Procedure Note
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/operating-room-record`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Operating Room Record
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/anesthesia-record`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Anesthesia Record
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/exparel-billing-worksheet`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Exparel Billing Worksheet
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/implant-billable-information`)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
-                            >
-                              Implant / Billable Info
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* PACU */}
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <h3 className="text-md font-bold text-yellow-700 mb-4 flex items-center gap-2">
-                            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400"></span>
-                            PACU
-                          </h3>
-                          <div className="flex flex-wrap gap-3">
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/immediate-postop-progress-note`)}
-                              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
-                            >
-                              Immediate Post-Op Progress Note
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-record`)}
-                              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
-                            >
-                              PACU Record
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-additional-nursing-notes`)}
-                              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
-                            >
-                              PACU Additional Nursing Notes
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/pacu-mobility`)}
-                              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
-                            >
-                              PACU Mobility Assessment
-                            </button>
-                            <button
-                              onClick={() => navigate(`/checkins/${activeCheckin.id}/post-operative-phone-call`)}
-                              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold"
-                            >
-                              Post-Op Phone Call
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="text-xs text-gray-500">
-                           Forms are saved to the chart and can be signed/locked with tablet signature.
-                        </div>
-
-                      </div>
-                    )}
-                  </section>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Appointments */}
         <section>
