@@ -35,6 +35,7 @@ import PostOpInfectionEducation from './pages/PostOpInfectionEducation';
 import DVTPeEducation from './pages/DVT_PE_Education';
 import PatientInstructions from './pages/PatientInstructions';
 import PreOpPhoneCall from "./pages/PreOpPhoneCall";
+import MedicationReconciliationForm from './pages/MedicationReconciliationForm';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import PrintSchedule from './pages/PrintSchedule';
@@ -167,6 +168,15 @@ function App() {
           element={
             <ProtectedRoute>
               <PrintPatientChart />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/checkins/:checkinId/medication-reconciliation"
+          element={
+            <ProtectedRoute>
+              <MedicationReconciliationForm />
             </ProtectedRoute>
           }
         />
