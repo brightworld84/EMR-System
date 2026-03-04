@@ -285,7 +285,7 @@ export default function AnesthesiaRecord() {
 
     try {
       const res = await api.get(`/anesthesia-record/?checkin=${checkinId}`);
-      const list = res.data || [];
+      const list = Array.isArray(res.data) ? res.data : (res.data?.results || []);
 
       if (list.length > 0) {
         const rec = list[0];
