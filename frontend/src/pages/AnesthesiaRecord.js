@@ -438,7 +438,6 @@ export default function AnesthesiaRecord() {
             >
               ← Back
             </button>
-          <div className="flex gap-2">
             <button
               className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50 font-semibold"
               onClick={saveDraft}
