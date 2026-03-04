@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
 const emptyRow = () => ({ time: "", bp: "", hr: "", rr: "", spo2: "", temp: "", etco2: "", note: "" });
@@ -431,6 +431,13 @@ export default function AnesthesiaRecord() {
               Check-in #{checkinId}
             </p>
           </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
+              ← Back
+            </button>
           <div className="flex gap-2">
             <button
               className="px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50 font-semibold"
