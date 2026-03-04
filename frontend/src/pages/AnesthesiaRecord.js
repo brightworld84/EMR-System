@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../services/api";
 
@@ -321,7 +321,11 @@ export default function AnesthesiaRecord() {
     }
   };
 
+  const loadStarted = useRef(false);
+
   useEffect(() => {
+    if (loadStarted.current) return;
+    loadStarted.current = true;
     loadOrCreate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkinId]);
