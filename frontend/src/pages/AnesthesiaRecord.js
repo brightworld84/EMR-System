@@ -8,6 +8,7 @@ const emptyPremed = () => ({ medication: "", dose: "", route: "", time: "" });
 
 export default function AnesthesiaRecord() {
   const { checkinId } = useParams();
+  const navigate = useNavigate();
 
   // NOTE:
   // This component’s UI state is FLAT (allergies, pmh, etc).
@@ -414,9 +415,6 @@ export default function AnesthesiaRecord() {
   const addPremedRow = () =>
     setData((prev) => ({ ...prev, premed_rows: [...prev.premed_rows, emptyPremed()] }));
 
-  // =========================================================
-  // Render (keep your existing JSX below)
-  // =========================================================
 
   if (loading) return <div className="p-6">Loading…</div>;
 
