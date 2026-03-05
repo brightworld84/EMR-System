@@ -469,7 +469,15 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='live')
     def live(self, request):
-        qs = self.get_queryset().filter(is_active=True)
+        clinic_tz = ZoneInfo(getattr(request.user.clinic, 'timezone', None) or 'America/Chicago')
+        now_local = timezone.now().astimezone(clinic_tz)
+        from datetime import datetime, time as dtime
+        start_of_day = datetime.combine(now_local.date(), dtime.min).replace(tzinfo=clinic_tz)
+
+        qs = self.get_queryset().filter(
+            is_active=True,
+            check_in_time__gte=start_of_day,
+        )
         return Response(self.get_serializer(qs, many=True).data)
     
     @action(detail=True, methods=['post'], url_path='set-status')
