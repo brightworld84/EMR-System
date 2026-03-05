@@ -494,6 +494,14 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             new_status=new_status,
             actor=request.user
         )
+
+        # Deactivate on discharge
+        if new_status == 'discharged':
+            obj.is_active = False
+            obj.check_out_time = obj.check_out_time or timezone.now()
+            obj.save(update_fields=['is_active', 'check_out_time'])
+      
+
         # ✅ Sync appointment status if linked
         # Map PatientCheckIn statuses to valid Appointment statuses
         APPT_STATUS_MAP = {
