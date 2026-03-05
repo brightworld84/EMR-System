@@ -452,7 +452,7 @@ function PatientDetail() {
                     <div>
                       <h3 className="text-md font-bold text-gray-900">
                         Check-in #{checkin.id}
-                        {checkin.is_active && (
+                        {checkin.is_active && isSameLocalDay(checkin.check_in_time) && (
                           <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
                             Active
                           </span>
