@@ -302,7 +302,7 @@ function PatientDetail() {
               {stage.forms.map((btn) => (
                 <button
                   key={btn.path}
-                  onClick={() => navigate(btn.path)}
+                  onClick={() => navigate(btn.path, { state: { serviceDate: checkin.check_in_time } })}
                   className={`px-3 py-2 ${stage.btnClass} text-white rounded-lg text-sm font-semibold`}
                 >
                   {btn.label}
