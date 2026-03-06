@@ -95,7 +95,7 @@ def build_dashboard_metrics(clinic, date_str=None):
     discharged_today = PatientCheckIn.objects.filter(
         clinic=clinic,
         discharged_at__isnull=False,
-        check_in_time__gte=start_of_day,
+        check_in_time__gte=start_of_today,
     )
 
     durations = [
