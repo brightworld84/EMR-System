@@ -126,7 +126,10 @@ export default function FallRiskAssessmentPreOpTesting() {
     }
   };
 
+  const loadStarted = useRef(false);
   useEffect(() => {
+    if (loadStarted.current) return;
+    loadStarted.current = true;
     loadOrCreate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkinId]);
