@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";;
 import api from "../services/api";
 
 const emptyRow = () => ({ time: "", bp: "", hr: "", rr: "", spo2: "", temp: "", etco2: "", note: "" });
