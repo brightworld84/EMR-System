@@ -1,6 +1,6 @@
 // src/pages/DVT_PE_Education.js
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";;
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../services/api";
 
 function TextLine({ label, value, onChange, disabled }) {
