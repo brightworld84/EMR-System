@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import api from '../services/api';
 
@@ -47,6 +47,11 @@ function emptyMedicationRow() {
 function PacuAdditionalNursingNotes() {
   const navigate = useNavigate();
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
 
   const sigRef = useRef(null);
 
@@ -97,6 +102,7 @@ function PacuAdditionalNursingNotes() {
         return;
       }
 
+      if (isHistoricalVisit) { setLoading(false); return; }
       const created = await api.post('/pacu-additional-nursing-notes/', { checkin: Number(checkinId) });
       setFormId(created.data.id);
       setData((prev) => ({

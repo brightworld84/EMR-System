@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import api from "../services/api";
 
 function TextField({ label, value, onChange, disabled, placeholder }) {
@@ -58,6 +58,11 @@ function MedicationRow({ idx, row, onChange, disabled }) {
 
 export default function MedicationReconciliationForm() {
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
   const navigate = useNavigate();
 
   const [formId, setFormId] = useState(null);
@@ -130,6 +135,7 @@ export default function MedicationReconciliationForm() {
         // Prevent duplicate POST in React strict mode
         if (formId) return;
         
+        if (isHistoricalVisit) { setLoading(false); return; }
         const created = await api.post('/medication-reconciliation/', { checkin: Number(checkinId) });
         setFormId(created.data.id);
         setData((prev) => ({ ...prev, ...created.data, checkin: Number(checkinId) }));

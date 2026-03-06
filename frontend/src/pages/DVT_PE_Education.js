@@ -20,6 +20,11 @@ function TextLine({ label, value, onChange, disabled }) {
 export default function DVTPeEducation() {
   const navigate = useNavigate();
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
 
   const defaults = useMemo(
     () => ({
@@ -85,6 +90,7 @@ export default function DVTPeEducation() {
       }
 
       // create blank record if none exists
+      if (isHistoricalVisit) { setLoading(false); return; }
       const created = await api.post("patient-education-dvt-pe/", {
         checkin: Number(checkinId),
       });

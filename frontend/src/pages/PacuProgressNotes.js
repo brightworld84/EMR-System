@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import api from '../services/api';
 
@@ -22,6 +22,11 @@ function makeEmptyRow() {
 function PacuProgressNotes() {
   const navigate = useNavigate();
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
 
   const sigRef = useRef(null);
 
@@ -40,7 +45,7 @@ function PacuProgressNotes() {
     signature_data_url: '',
   });
 
-  const isSigned = !!data.is_signed;
+  const isSigned = !!data.is_signed || isHistoricalVisit;
 
   const handlePrint = () => {
     window.print();
@@ -66,6 +71,7 @@ function PacuProgressNotes() {
         return;
       }
 
+      if (isHistoricalVisit) { setLoading(false); return; }
       const created = await api.post('/pacu-progress-notes/', { checkin: Number(checkinId) });
       setNotesId(created.data.id);
       setData((prev) => ({

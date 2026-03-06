@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import api from "../services/api";
 
 function TextField({ label, value, onChange, disabled, placeholder }) {
@@ -28,6 +28,11 @@ function CheckboxRow({ label, checked, onChange, disabled }) {
 
 export default function PreOpPhoneCall() {
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
   const navigate = useNavigate();
 
   const [recordId, setRecordId] = useState(null);
@@ -98,6 +103,8 @@ export default function PreOpPhoneCall() {
           setIsSigned(existing.completed || false);
         } else {
           // Create new record
+          if (isHistoricalVisit) { setLoading(false); return; }
+          if (isHistoricalVisit) { setLoading(false); return; }
           const createRes = await api.post('/pre-op-phone-call/', {
             checkin: checkinId,
           });

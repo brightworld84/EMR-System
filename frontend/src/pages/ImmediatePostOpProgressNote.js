@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import api from '../services/api';
 
 function ImmediatePostOpProgressNote() {
   const navigate = useNavigate();
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
   const sigRef = useRef(null);
 
   const [noteId, setNoteId] = useState(null);
@@ -63,7 +68,7 @@ function ImmediatePostOpProgressNote() {
     signature_data_url: '',
   });
 
-  const isSigned = !!data.is_signed;
+  const isSigned = !!data.is_signed || isHistoricalVisit;
 
   // Badge support 
   const isAutofilled =
@@ -94,6 +99,7 @@ function ImmediatePostOpProgressNote() {
         return;
       }
 
+      if (isHistoricalVisit) { setLoading(false); return; }
       const created = await api.post('/immediate-postop-progress-note/', { checkin: Number(checkinId) });
       setNoteId(created.data.id);
       setData((prev) => ({ ...prev, ...created.data, checkin: Number(checkinId) }));

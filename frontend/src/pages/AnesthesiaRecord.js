@@ -8,6 +8,11 @@ const emptyPremed = () => ({ medication: "", dose: "", route: "", time: "" });
 
 export default function AnesthesiaRecord() {
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
   const navigate = useNavigate();
 
   // NOTE:
@@ -310,6 +315,7 @@ export default function AnesthesiaRecord() {
           regional_anesthesia: {},
           notes: {},
         };
+        if (isHistoricalVisit) { setLoading(false); return; }
         const created = await api.post(`/anesthesia-record/`, payload);
         setRecordId(created.data.id);
         setData((prev) => ({ ...prev, ...unpackFromApi(created.data) }));

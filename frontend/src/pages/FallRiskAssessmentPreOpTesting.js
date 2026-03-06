@@ -5,6 +5,11 @@ import api from "../services/api";
 export default function FallRiskAssessmentPreOpTesting() {
   const navigate = useNavigate();
   const { checkinId } = useParams();
+  const location = useLocation();
+  const _serviceDate = location.state?.serviceDate;
+  const isHistoricalVisit = _serviceDate
+    ? new Date(_serviceDate).toDateString() !== new Date().toDateString()
+    : false;
 
   // IMPORTANT: no leading slash, because api.js baseURL already ends with /api
   const ENDPOINT = "fall-risk-assessment-preop-testing";
@@ -111,6 +116,7 @@ export default function FallRiskAssessmentPreOpTesting() {
         // Prevent duplicate POST in React strict mode
         if (recordId) return;
 
+        if (isHistoricalVisit) { setLoading(false); return; }
         const created = await api.post(`${ENDPOINT}/`, { checkin: Number(checkinId) });
         setRecordId(created.data.id);
         setData((prev) => ({
