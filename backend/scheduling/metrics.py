@@ -19,10 +19,16 @@ def minutes_between(a, b):
 def build_dashboard_metrics(clinic, date_str=None):
     now = timezone.now()
 
+    clinic_tz = ZoneInfo(getattr(clinic, 'timezone', None) or 'America/Chicago')
+    now_local = now.astimezone(clinic_tz)
+    from datetime import time as dtime
+    start_of_today = datetime.combine(now_local.date(), dtime.min).replace(tzinfo=clinic_tz)
+
     live_qs = PatientCheckIn.objects.filter(
         clinic=clinic,
         is_active=True,
         check_out_time__isnull=True,
+        check_in_time__gte=start_of_today,
     )
 
     by_status = list(
@@ -86,7 +92,6 @@ def build_dashboard_metrics(clinic, date_str=None):
         })
 
     # Average total visit duration for discharged patients today
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     discharged_today = PatientCheckIn.objects.filter(
         clinic=clinic,
         discharged_at__isnull=False,
