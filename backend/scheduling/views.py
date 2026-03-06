@@ -450,6 +450,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 class PatientCheckInViewSet(viewsets.ModelViewSet):
     serializer_class = PatientCheckInSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ['patient', 'status', 'is_active']
 
     def get_queryset(self):
         return PatientCheckIn.objects.filter(
