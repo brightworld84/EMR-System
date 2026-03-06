@@ -462,10 +462,21 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             checked_in_by=self.request.user
         )
 
-    @action(detail=False, methods=['get'], url_path='metrics/dashboard')
-    def metrics_dashboard(self, request):
-        data = build_dashboard_metrics(request.user.clinic)
-        return Response(data)
+        @action(detail=False, methods=['get'], url_path='metrics/dashboard')
+        def metrics_dashboard(self, request):
+            date_str = request.query_params.get('date')
+            start_str = request.query_params.get('start_date')
+            end_str = request.query_params.get('end_date')
+
+            if start_str and end_str:
+                from .metrics import build_range_metrics
+                data = build_range_metrics(request.user.clinic, start_str, end_str)
+                if data is None:
+                    return Response({'detail': 'Invalid date range.'}, status=400)
+                return Response(data)
+
+            data = build_dashboard_metrics(request.user.clinic, date_str=date_str)
+            return Response(data)
 
     @action(detail=False, methods=['get'], url_path='live')
     def live(self, request):

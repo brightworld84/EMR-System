@@ -117,3 +117,60 @@ def build_dashboard_metrics(clinic, date_str=None):
         'today_outcomes_by_status':          today_outcomes,
         'today_outcomes_by_provider':        today_by_provider,
     }
+
+def build_range_metrics(clinic, start_str, end_str):
+    """Aggregate appointment outcomes across a date range."""
+    from datetime import date
+    clinic_tz = ZoneInfo(getattr(clinic, 'timezone', None) or 'America/Chicago')
+
+    try:
+        start_date = date.fromisoformat(start_str)
+        end_date = date.fromisoformat(end_str)
+    except Exception:
+        return None
+
+    start_utc = datetime.combine(start_date, time.min).replace(tzinfo=clinic_tz).astimezone(ZoneInfo("UTC"))
+    end_utc = datetime.combine(end_date, time.max).replace(tzinfo=clinic_tz).astimezone(ZoneInfo("UTC"))
+
+    appts_qs = Appointment.objects.filter(
+        clinic=clinic,
+        scheduled_start__range=(start_utc, end_utc),
+    )
+
+    outcomes = list(
+        appts_qs.values('status')
+        .annotate(count=Count('id'))
+        .order_by('status')
+    )
+
+    by_provider = list(
+        appts_qs.values('provider_name', 'status')
+        .annotate(count=Count('id'))
+        .order_by('provider_name', 'status')
+    )
+
+    discharged_qs = PatientCheckIn.objects.filter(
+        clinic=clinic,
+        discharged_at__isnull=False,
+        check_in_time__gte=start_utc,
+        check_in_time__lte=end_utc,
+    )
+
+    durations = [
+        d for d in (
+            minutes_between(c.check_in_time, c.discharged_at)
+            for c in discharged_qs
+        ) if d is not None
+    ]
+    avg_total = int(sum(durations) / len(durations)) if durations else None
+
+    return {
+        'generated_at': timezone.now().isoformat(),
+        'start_date': start_str,
+        'end_date': end_str,
+        'total_appointments': appts_qs.count(),
+        'outcomes_by_status': outcomes,
+        'outcomes_by_provider': by_provider,
+        'avg_total_visit_minutes': avg_total,
+        'total_discharged': discharged_qs.count(),
+    }
