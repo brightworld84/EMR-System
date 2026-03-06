@@ -477,8 +477,8 @@ function PatientDetail() {
                     </div>
                   </div>
                   
-                  {/* Surgery Forms */}
-                  {renderFormButtons(checkin)}
+                  {/* Surgery Forms - only show for today active checkins */}
+                  {checkin.is_active && isSameLocalDay(checkin.check_in_time) ? renderFormButtons(checkin) : null}
 
                 </div>
               ))}
