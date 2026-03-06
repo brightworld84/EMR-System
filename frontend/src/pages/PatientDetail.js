@@ -461,7 +461,13 @@ function PatientDetail() {
                       <p className="text-sm text-gray-600">
                         Checked in: {checkin.check_in_time ? new Date(checkin.check_in_time).toLocaleString() : '—'}
                         {' • '}
-                        Status: <span className="font-semibold">{checkin.status || '—'}</span>
+                        Status: <span className="font-semibold">{{
+                          'checked_in': 'Checked In',
+                          'pre_op': 'Pre-Op',
+                          'operating_room': 'Operating Room',
+                          'pacu': 'PACU',
+                          'discharged': 'Discharged',
+                        }[checkin.status] || checkin.status || '—'}</span>
                         {checkin.check_out_time && (
                           <>
                             {' • '}
