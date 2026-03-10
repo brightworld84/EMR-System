@@ -1,5 +1,5 @@
 // src/pages/DVT_PE_Education.js
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../services/api";
 
@@ -29,15 +29,9 @@ export default function DVTPeEducation() {
   const defaults = useMemo(
     () => ({
       checkin: checkinId ? Number(checkinId) : null,
-
-      // These field names are intentionally generic.
-      // They will still save even if your serializer ignores unknown keys,
-      // BUT ideally they should match your model/serializer fields.
       patient_signature: "",
       nurse_signature: "",
-      acknowledged_at: "", // optional (string date)
-
-      // If your backend returns lock fields, we respect them:
+      acknowledged_at: "",
       is_signed: false,
       is_complete: false,
       signed_at: null,
@@ -50,6 +44,7 @@ export default function DVTPeEducation() {
   const [data, setData] = useState(defaults);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [error, setError] = useState("");
 
   const isLocked = !!data?.is_signed || !!data?.is_complete;
@@ -67,16 +62,13 @@ export default function DVTPeEducation() {
 
   const loadOrCreate = async () => {
     if (!checkinId) return;
-
     setError("");
     setLoading(true);
-
     try {
       const res = await api.get(
-        `patient-education-dvt-pe/?checkin=${encodeURIComponent(checkinId)}`
+        `/patient-education-dvt-pe/?checkin=${encodeURIComponent(checkinId)}`
       );
       const list = normalizeList(res.data);
-
       if (list.length > 0) {
         const r = list[0];
         setRecordId(r.id);
@@ -89,12 +81,14 @@ export default function DVTPeEducation() {
         return;
       }
 
-      // create blank record if none exists
-      if (isHistoricalVisit) { setLoading(false); return; }
-      const created = await api.post("patient-education-dvt-pe/", {
+      if (isHistoricalVisit) {
+        setLoading(false);
+        return;
+      }
+
+      const created = await api.post("/patient-education-dvt-pe/", {
         checkin: Number(checkinId),
       });
-
       setRecordId(created.data.id);
       setData((prev) => ({
         ...prev,
@@ -123,10 +117,8 @@ export default function DVTPeEducation() {
       await loadOrCreate();
       return;
     }
-
     setError("");
     setSaving(true);
-
     try {
       const payload = {
         checkin: Number(checkinId),
@@ -134,8 +126,7 @@ export default function DVTPeEducation() {
         nurse_signature: data.nurse_signature || "",
         acknowledged_at: data.acknowledged_at || null,
       };
-
-      const res = await api.patch(`patient-education-dvt-pe/${recordId}/`, payload);
+      const res = await api.patch(`/patient-education-dvt-pe/${recordId}/`, payload);
       setData((prev) => ({ ...prev, ...res.data, checkin: Number(checkinId) }));
       alert("Saved.");
     } catch (e) {
@@ -146,15 +137,37 @@ export default function DVTPeEducation() {
     }
   };
 
+  const signAndLock = async () => {
+    if (!recordId || isLocked) return;
+    setError("");
+    setSigning(true);
+    try {
+      await saveDraft();
+      const res = await api.post(`/patient-education-dvt-pe/${recordId}/sign/`, {});
+      setData((prev) => ({ ...prev, ...res.data, checkin: Number(checkinId) }));
+      alert("Signed & locked.");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to sign. Please try again.");
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const headerSubtitle = data.signed_at
+    ? `Signed at ${new Date(data.signed_at).toLocaleString()}`
+    : "Draft";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow print:hidden">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">DVT / PE Education</h1>
-            <p className="text-sm text-gray-600">Check-in #{checkinId}</p>
+            <p className="text-sm text-gray-600">
+              Check-in #{checkinId} • {headerSubtitle}
+            </p>
           </div>
-
           <div className="flex gap-2 flex-wrap justify-end">
             <button
               onClick={() => navigate(-1)}
@@ -162,20 +175,25 @@ export default function DVTPeEducation() {
             >
               ← Back
             </button>
-
             <button
               onClick={() => window.print()}
               className="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-black font-semibold"
             >
               Print / PDF
             </button>
-
             <button
               onClick={saveDraft}
               disabled={loading || saving || isLocked}
-              className="px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold disabled:bg-gray-300"
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:bg-blue-300"
             >
               {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={signAndLock}
+              disabled={loading || signing || isLocked}
+              className="px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-black font-semibold disabled:bg-gray-400"
+            >
+              {isLocked ? "Signed" : signing ? "Signing…" : "Sign / Lock"}
             </button>
           </div>
         </div>
@@ -203,8 +221,7 @@ export default function DVTPeEducation() {
             <div className="text-center mb-6">
               <div className="text-sm text-gray-600">Dallas Joint &amp; Spine Center</div>
               <h2 className="text-lg font-extrabold text-gray-900 mt-2">
-                ARE YOU AT RISK FOR DEEP VEIN THROMBOSIS (DVT)
-                <br />
+                ARE YOU AT RISK FOR DEEP VEIN THROMBOSIS (DVT) <br />
                 OR PULMONARY EMBOLUS (PE)
               </h2>
             </div>
@@ -241,7 +258,6 @@ export default function DVTPeEducation() {
                   <li>Shortness of breath or difficulty breathing, rapid breathing.</li>
                   <li>Severe lightheadedness, rapid heart rate, sweating.</li>
                 </ol>
-
                 <div className="mt-4 border border-gray-900 rounded-md p-4 text-center">
                   <div className="font-extrabold text-gray-900">PULMONARY EMBOLISM CAN BE FATAL</div>
                   <div className="text-sm font-bold mt-1">If you have signs or symptoms of PE</div>
@@ -266,7 +282,6 @@ export default function DVTPeEducation() {
                     />
                   </div>
                 </div>
-
                 <div className="border border-gray-300 rounded-md p-4">
                   <TextLine
                     label="Educating Nurse Signature (type full name)"
@@ -274,21 +289,24 @@ export default function DVTPeEducation() {
                     disabled={isLocked}
                     onChange={(v) => setField("nurse_signature", v)}
                   />
-                  <div className="mt-3">
-                    <div className="text-xs text-gray-500">
-                      (If you want a separate nurse date field, tell me your backend field name and I’ll add it.)
-                    </div>
-                  </div>
                 </div>
               </section>
 
               <div className="print:hidden text-xs text-gray-500 pt-2">
-                Tip: Use “Print / PDF” to confirm the layout matches the paper.
+                Tip: Use "Print / PDF" to confirm the layout matches the paper.
               </div>
             </div>
           </div>
         )}
       </main>
+
+      <style>{`
+        @media print {
+          body { background: white !important; }
+          .print\\:hidden { display: none !important; }
+          section { page-break-inside: avoid; }
+        }
+      `}</style>
     </div>
   );
 }
